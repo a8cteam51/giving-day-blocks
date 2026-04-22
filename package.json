@@ -1,0 +1,53 @@
+{
+  "name": "giving-day-blocks",
+  "version": "0.1.0",
+  "description": "An out-of-the-box Giving Day product for WooCommerce. Blocks, data layer, and admin dashboard for running a fundraiser event.",
+  "author": {
+    "name": "Team51 Special Projects",
+    "url": "https://wpspecialprojects.wordpress.com"
+  },
+  "license": "GPL-3.0-or-later",
+  "keywords": [
+    "wordpress",
+    "woocommerce",
+    "donation",
+    "fundraising",
+    "giving-day",
+    "blocks"
+  ],
+  "homepage": "https://github.com/a8cteam51/giving-day-blocks",
+  "repository": "https://github.com/a8cteam51/giving-day-blocks",
+  "bugs": "https://github.com/a8cteam51/giving-day-blocks/issues",
+  "private": true,
+  "engines": {
+    "node": ">=20.10",
+    "npm": ">=10.2"
+  },
+  "devDependencies": {
+    "@wordpress/browserslist-config": "^5.25.13",
+    "@wordpress/jest-preset-default": "^11.19.0",
+    "@wordpress/scripts": "^26.13.13",
+    "jest": "^29.7.0",
+    "jest-environment-jsdom": "^29.7.0",
+    "npm-run-all": "^4.1.5"
+  },
+  "browserslist": [
+    "extends @wordpress/browserslist-config"
+  ],
+  "scripts": {
+    "build": "wp-scripts build --webpack-src-dir=blocks/src --output-path=blocks/build --webpack-copy-php",
+    "start": "wp-scripts start --webpack-src-dir=blocks/src --output-path=blocks/build --webpack-copy-php",
+    "format": "npm-run-all --sequential format:**",
+    "format:scripts": "wp-scripts format blocks --no-error-on-unmatched-pattern",
+    "format:styles": "npm run lint:styles -- --fix",
+    "lint": "npm-run-all --sequential lint:**",
+    "lint:scripts": "wp-scripts lint-js blocks --no-error-on-unmatched-pattern",
+    "lint:styles": "wp-scripts lint-style \"blocks/**/*.{css,sass,scss}\" --allow-empty-input --report-descriptionless-disables --report-invalid-scope-disables --report-needless-disables",
+    "lint:pkg-json": "wp-scripts lint-pkg-json",
+    "lint:readme-md": "wp-scripts lint-md-docs README.md",
+    "test": "wp-scripts test-unit-js --config jest.config.js",
+    "test:watch": "wp-scripts test-unit-js --config jest.config.js --watch",
+    "check-engines": "wp-scripts check-engines",
+    "check-licenses": "wp-scripts check-licenses"
+  }
+}

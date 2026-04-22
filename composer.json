@@ -1,0 +1,70 @@
+{
+  "name": "a8cteam51/giving-day-blocks",
+  "type": "wordpress-plugin",
+  "description": "An out-of-the-box Giving Day product for WooCommerce. Blocks, data layer, and admin dashboard for running a fundraiser event.",
+  "homepage": "https://github.com/a8cteam51/giving-day-blocks",
+  "license": "GPL-3.0-or-later",
+  "authors": [
+    {
+      "name": "Team51 Special Projects",
+      "homepage": "https://wpspecialprojects.wordpress.com"
+    }
+  ],
+  "repositories": [
+    {
+      "type": "composer",
+      "url": "https://wpackagist.org"
+    }
+  ],
+  "require": {
+    "php": ">=8.1",
+    "ext-json": "*"
+  },
+  "require-dev": {
+    "johnpbloch/wordpress-core": "6.4.*",
+    "wpackagist-plugin/woocommerce": "7.5.*",
+    "wp-cli/i18n-command": "^2.6",
+    "wp-coding-standards/wpcs": "^3.0",
+    "phpcompatibility/phpcompatibility-wp": "*",
+    "roave/security-advisories": "dev-latest"
+  },
+  "autoload": {
+    "psr-4": {
+      "Team51\\GivingDay\\": "src/"
+    }
+  },
+  "scripts": {
+    "generate-autoloader": "@composer dump-autoload -o",
+    "format:php": "phpcbf --basepath=. . -v",
+    "lint:php": "phpcs --basepath=. . -v",
+    "internationalize": [
+      "@makepot",
+      "@updatepo",
+      "@makejson"
+    ],
+    "makepot": "wp i18n make-pot . ./languages/giving-day-blocks.pot",
+    "updatepo": "wp i18n update-po ./languages/giving-day-blocks.pot",
+    "makejson": "wp i18n make-json ./languages --pretty-print --no-purge",
+    "packages-install": "@composer install --ignore-platform-reqs --no-interaction",
+    "packages-update": [
+      "@composer clear-cache",
+      "@composer update --prefer-stable --no-interaction"
+    ]
+  },
+  "config": {
+    "allow-plugins": {
+      "composer/*": true,
+      "dealerdirect/phpcodesniffer-composer-installer": true
+    },
+    "platform": {
+      "php": "8.1"
+    }
+  },
+  "extra": {
+    "installer-paths": {
+      "vendor/wpackagist-plugin/{$name}/": [
+        "type:wordpress-plugin"
+      ]
+    }
+  }
+}
