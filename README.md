@@ -129,3 +129,6 @@ Shared hooks (`useCountdown`, `useLiveRefresh`) have their own unit tests under 
 
 `@wordpress/api-fetch` and `@wordpress/data` are mocked via `tests/__mocks__/`.
 
+## License
+
+This plugin is licensed under the **GNU General Public License v2.0 or later** 
