@@ -111,6 +111,18 @@ composer install
 npm install
 ```
 
+### First-activation sample data
+
+On first activation (and only then), the plugin seeds a tiny "Hello Dolly"-style data set so the admin and block editor have something to render out of the box: one Campaign dated to the current year, two Teams, one Beneficiary, one Match, one Challenge, and a short hierarchy under each taxonomy. Seeding is skipped if any Campaign already exists, so it never clobbers real content.
+
+To re-seed during development, delete the sample posts and clear the "already seeded" marker:
+
+```bash
+wp option delete giving_day_blocks_seeded_ids
+wp post delete $(wp post list --post_type=giving_campaign,giving_team,giving_beneficiary,giving_match,giving_challenge --format=ids) --force
+# then deactivate + reactivate the plugin
+```
+
 ### Scripts
 
 ```bash

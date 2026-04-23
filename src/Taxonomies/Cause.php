@@ -45,7 +45,7 @@ final class Cause extends AbstractTaxonomy {
 				'add_new_item'             => __( 'Add New Beneficiary Cause', 'giving-day-blocks' ),
 				'search_items'             => __( 'Search Beneficiary Causes', 'giving-day-blocks' ),
 				'not_found'                => __( 'No causes found.', 'giving-day-blocks' ),
-				'parent_field_description' => __( 'Assign a parent Cause to build a hierarchy for Beneficiaries (e.g. use "Science" as the parent of "Climate", "Space").', 'giving-day-blocks' ),
+				'parent_field_description' => __( 'Assign a parent Cause to build a hierarchy for Beneficiaries (e.g. use "Science" as the parent of "Geology", "Space").', 'giving-day-blocks' ),
 				'name_field_description'   => __( 'The name is how this Cause appears on your site when Beneficiaries are browsed by cause.', 'giving-day-blocks' ),
 				'slug_field_description'   => __( 'The URL-friendly version of the Cause name.', 'giving-day-blocks' ),
 				'desc_field_description'   => __( 'Optional description for this Cause. May be shown when browsing Beneficiaries by cause.', 'giving-day-blocks' ),
