@@ -27,12 +27,30 @@ All blocks are:
 
 ## Data model
 
-Four custom post types, all `show_in_rest`:
+### Custom Post Types
 
-- **`giving_campaign`** — the event itself: start/end, pre-event start, goal amount, currency, timezone, linked donation products.
-- **`giving_team`** — belongs to a campaign; has a captain, slug, image, optional team goal.
-- **`giving_match`** — sponsor match: multiplier, cap, active window.
-- **`giving_challenge`** — time-boxed challenge: type (donations / amount / team), threshold, reward.
+Five custom post types, all `show_in_rest` and registered under the `giving-day/v1` REST namespace:
+
+| Post type | REST base | Purpose |
+|-----------|-----------|---------|
+| **`giving_campaign`** | `campaigns` | The event itself: pre-event start, start/end, timezone, goal amount, currency, and linked WooCommerce donation products. One post per event run (recreated each year). |
+| **`giving_team`** | `teams` | *Who* is raising — a group of fundraisers. Long-lived; references one or more campaigns via `_giving_team_campaigns`, has a captain user, optional team goal. |
+| **`giving_beneficiary`** | `beneficiaries` | *What* gets funded — the destination of a donation (e.g. "Center for Planetary Studies"). Long-lived; references one or more campaigns via `_giving_beneficiary_campaigns`, carries an optional goal and parent-org label. |
+| **`giving_match`** | `matches` | Sponsor match tied to a single campaign: multiplier, cap amount, active window, sponsor label. One-off per event. |
+| **`giving_challenge`** | `challenges` | Reusable, time-boxed mini-event: type (`donation_count` / `amount_raised` / `team`), threshold, reward, and a *relative* window (e.g. `PT0H–PT1H`) resolved per campaign. |
+
+All five are registered as `show_ui` + `show_in_rest`, grouped under a single **Giving Day** admin menu, and are non-public (`public => false`, `has_archive => false`, `rewrite => false`) — they are data containers for blocks, not browsable URLs.
+
+### Taxonomies
+
+Two hierarchical taxonomies, both `show_in_rest`:
+
+| Taxonomy | REST base | Attached to | Purpose |
+|----------|-----------|-------------|---------|
+| **`giving_cause`** | `causes` | `giving_beneficiary` | Powers the "Give to a cause" browsing flow. Top-level terms (e.g. *Science*, *Arts & Humanities*) contain sub-causes (e.g. *Astronomy*, *Music*). A beneficiary can be tagged with multiple terms. |
+| **`giving_team_category`** | `team-categories` | `giving_team` | Powers tabbed/faceted leaderboards. Top-level terms are grouping dimensions (e.g. *Class Year*, *Athletic*, *Department*); child terms are the buckets (e.g. *2014*, *Rowing*, *Engineering*). A team can carry multiple tags across dimensions. |
+
+Both taxonomies are hierarchical, non-public, admin-visible (`show_admin_column => true`), and their terms are intentionally long-lived — they persist across every Giving Day.
 
 ## REST API
 
