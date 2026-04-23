@@ -14,8 +14,15 @@ defined( 'ABSPATH' ) || exit;
  * Registers the `giving_challenge` custom post type.
  *
  * A challenge is a time-boxed mini-event inside a Campaign (e.g. "get 50
- * donations in the next hour and a sponsor unlocks $10,000"). Challenges
- * come in three flavors, controlled by `_giving_challenge_type`:
+ * donations in the next hour and a sponsor unlocks $10,000").
+ *
+ * Challenges are long-lived templates that can be reused across multiple
+ * Campaigns (e.g. "Power Hour" runs every year). Participation is recorded
+ * in the `_giving_challenge_campaigns` array meta. Windows are stored as
+ * ISO 8601 durations relative to each Campaign's start, so the same
+ * challenge can run at "+4h to +5h" regardless of the year.
+ *
+ * Challenges come in three flavors, controlled by `_giving_challenge_type`:
  *
  * - `donation_count` — threshold is a count of donations
  * - `amount`         — threshold is a dollar amount raised
@@ -26,13 +33,13 @@ final class Challenge extends AbstractPostType {
 	public const POST_TYPE = 'giving_challenge';
 	public const REST_BASE = 'challenges';
 
-	public const META_CAMPAIGN_ID   = '_giving_campaign_id';
-	public const META_TYPE          = '_giving_challenge_type';
-	public const META_THRESHOLD     = '_giving_challenge_threshold';
-	public const META_REWARD_LABEL  = '_giving_challenge_reward_label';
-	public const META_REWARD_AMOUNT = '_giving_challenge_reward_amount';
-	public const META_WINDOW_START  = '_giving_challenge_window_start';
-	public const META_WINDOW_END    = '_giving_challenge_window_end';
+	public const META_CAMPAIGN_IDS         = '_giving_challenge_campaigns';
+	public const META_TYPE                 = '_giving_challenge_type';
+	public const META_THRESHOLD            = '_giving_challenge_threshold';
+	public const META_REWARD_LABEL         = '_giving_challenge_reward_label';
+	public const META_REWARD_AMOUNT        = '_giving_challenge_reward_amount';
+	public const META_WINDOW_OFFSET_START  = '_giving_challenge_window_offset_start';
+	public const META_WINDOW_OFFSET_END    = '_giving_challenge_window_offset_end';
 
 	/**
 	 * Allowed challenge types.
@@ -78,12 +85,14 @@ final class Challenge extends AbstractPostType {
 
 	protected function get_meta_fields(): array {
 		return array(
-			self::META_CAMPAIGN_ID   => array(
-				'type'        => 'integer',
-				'description' => __( 'ID of the parent Campaign.', 'giving-day-blocks' ),
-				'default'     => 0,
+			self::META_CAMPAIGN_IDS        => array(
+				'type'         => 'array',
+				'description'  => __( 'IDs of the Campaigns this challenge is attached to. A challenge can be reused across multiple Campaigns.', 'giving-day-blocks' ),
+				'default'      => array(),
+				'single'       => true,
+				'show_in_rest' => self::rest_array_of_integers(),
 			),
-			self::META_TYPE          => array(
+			self::META_TYPE                => array(
 				'type'              => 'string',
 				'description'       => __( 'Challenge type: donation_count, amount, or team.', 'giving-day-blocks' ),
 				'default'           => 'donation_count',
@@ -92,29 +101,29 @@ final class Challenge extends AbstractPostType {
 					return in_array( $value, self::TYPES, true ) ? $value : 'donation_count';
 				},
 			),
-			self::META_THRESHOLD     => array(
+			self::META_THRESHOLD           => array(
 				'type'        => 'number',
 				'description' => __( 'Threshold the challenge must reach (count or amount depending on type).', 'giving-day-blocks' ),
 				'default'     => 0,
 			),
-			self::META_REWARD_LABEL  => array(
+			self::META_REWARD_LABEL        => array(
 				'type'        => 'string',
 				'description' => __( 'Short description of what unlocks when the challenge succeeds.', 'giving-day-blocks' ),
 				'default'     => '',
 			),
-			self::META_REWARD_AMOUNT => array(
+			self::META_REWARD_AMOUNT       => array(
 				'type'        => 'number',
 				'description' => __( 'Optional dollar value of the unlocked reward.', 'giving-day-blocks' ),
 				'default'     => 0,
 			),
-			self::META_WINDOW_START  => array(
+			self::META_WINDOW_OFFSET_START => array(
 				'type'        => 'string',
-				'description' => __( 'Challenge window start (ISO 8601).', 'giving-day-blocks' ),
+				'description' => __( 'Challenge window start, as an ISO 8601 duration relative to the Campaign start (e.g. "PT4H" = 4 hours in).', 'giving-day-blocks' ),
 				'default'     => '',
 			),
-			self::META_WINDOW_END    => array(
+			self::META_WINDOW_OFFSET_END   => array(
 				'type'        => 'string',
-				'description' => __( 'Challenge window end (ISO 8601).', 'giving-day-blocks' ),
+				'description' => __( 'Challenge window end, as an ISO 8601 duration relative to the Campaign start (e.g. "PT5H" = 5 hours in).', 'giving-day-blocks' ),
 				'default'     => '',
 			),
 		);

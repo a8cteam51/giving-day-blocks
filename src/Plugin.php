@@ -8,10 +8,13 @@
 
 namespace Team51\GivingDay;
 
+use Team51\GivingDay\PostTypes\Beneficiary;
 use Team51\GivingDay\PostTypes\Campaign;
 use Team51\GivingDay\PostTypes\Challenge;
 use Team51\GivingDay\PostTypes\GivingMatch;
 use Team51\GivingDay\PostTypes\Team;
+use Team51\GivingDay\Taxonomies\Cause;
+use Team51\GivingDay\Taxonomies\TeamCategory;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -50,6 +53,27 @@ final class Plugin {
 	 * @var Challenge|null
 	 */
 	public ?Challenge $challenge = null;
+
+	/**
+	 * The Beneficiary custom post type component.
+	 *
+	 * @var Beneficiary|null
+	 */
+	public ?Beneficiary $beneficiary = null;
+
+	/**
+	 * The Cause taxonomy component.
+	 *
+	 * @var Cause|null
+	 */
+	public ?Cause $cause = null;
+
+	/**
+	 * The Team Category taxonomy component.
+	 *
+	 * @var TeamCategory|null
+	 */
+	public ?TeamCategory $team_category = null;
 
 	/**
 	 * Plugin constructor. Kept protected to enforce the singleton pattern.
@@ -110,5 +134,14 @@ final class Plugin {
 
 		$this->challenge = new Challenge();
 		$this->challenge->register();
+
+		$this->beneficiary = new Beneficiary();
+		$this->beneficiary->register();
+
+		$this->cause = new Cause();
+		$this->cause->register();
+
+		$this->team_category = new TeamCategory();
+		$this->team_category->register();
 	}
 }

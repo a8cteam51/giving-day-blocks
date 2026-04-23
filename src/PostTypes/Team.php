@@ -13,7 +13,10 @@ defined( 'ABSPATH' ) || exit;
 /**
  * Registers the `giving_team` custom post type.
  *
- * A team belongs to exactly one Campaign and groups donations in the leaderboard.
+ * Teams are long-lived entities that can participate in multiple Campaigns
+ * (e.g. the same "Team Alpha" runs every year). Participation is recorded
+ * as an array of campaign IDs in the `_giving_team_campaigns` meta.
+ *
  * The team's slug is the WordPress post slug; its image is the featured image.
  */
 final class Team extends AbstractPostType {
@@ -21,9 +24,9 @@ final class Team extends AbstractPostType {
 	public const POST_TYPE = 'giving_team';
 	public const REST_BASE = 'teams';
 
-	public const META_CAMPAIGN_ID = '_giving_campaign_id';
-	public const META_CAPTAIN_ID  = '_giving_team_captain_id';
-	public const META_GOAL_AMOUNT = '_giving_team_goal_amount';
+	public const META_CAMPAIGN_IDS = '_giving_team_campaigns';
+	public const META_CAPTAIN_ID   = '_giving_team_captain_id';
+	public const META_GOAL_AMOUNT  = '_giving_team_goal_amount';
 
 	public function get_post_type(): string {
 		return self::POST_TYPE;
@@ -64,19 +67,21 @@ final class Team extends AbstractPostType {
 
 	protected function get_meta_fields(): array {
 		return array(
-			self::META_CAMPAIGN_ID => array(
-				'type'        => 'integer',
-				'description' => __( 'ID of the parent Campaign.', 'giving-day-blocks' ),
-				'default'     => 0,
+			self::META_CAMPAIGN_IDS => array(
+				'type'         => 'array',
+				'description'  => __( 'IDs of the Campaigns this team participates in. A team can participate in multiple Campaigns across years.', 'giving-day-blocks' ),
+				'default'      => array(),
+				'single'       => true,
+				'show_in_rest' => self::rest_array_of_integers(),
 			),
-			self::META_CAPTAIN_ID  => array(
+			self::META_CAPTAIN_ID   => array(
 				'type'        => 'integer',
 				'description' => __( 'WordPress user ID of the team captain.', 'giving-day-blocks' ),
 				'default'     => 0,
 			),
-			self::META_GOAL_AMOUNT => array(
+			self::META_GOAL_AMOUNT  => array(
 				'type'        => 'number',
-				'description' => __( 'Optional team-level fundraising goal.', 'giving-day-blocks' ),
+				'description' => __( 'Optional team-level fundraising goal (aggregated across participating Campaigns when multiple).', 'giving-day-blocks' ),
 				'default'     => 0,
 			),
 		);

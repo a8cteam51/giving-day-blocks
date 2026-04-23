@@ -129,6 +129,243 @@ Shared hooks (`useCountdown`, `useLiveRefresh`) have their own unit tests under 
 
 `@wordpress/api-fetch` and `@wordpress/data` are mocked via `tests/__mocks__/`.
 
+## Concepts by example
+
+The data model is best understood through a concrete scenario. Imagine **Awesome University** is running its annual Giving Day. Here's what each record looks like, and how they connect.
+
+### How the pieces connect
+
+```mermaid
+flowchart TB
+    subgraph Instance["Per-instance — recreated each event"]
+        CAMP["<b>giving_campaign</b><br/>Awesome Giving Day 2026"]
+        MATCH["<b>giving_match</b><br/>Trustees' Power Hour Match"]
+    end
+
+    subgraph Reusable["Reusable — long-lived, re-used each year"]
+        TEAM["<b>giving_team</b><br/><i>who is raising</i>"]
+        BEN["<b>giving_beneficiary</b><br/><i>what gets funded</i>"]
+        CHAL["<b>giving_challenge</b><br/>Power Hour mini-event"]
+    end
+
+    subgraph Taxonomies["Hierarchical taxonomies"]
+        CAUSE["<b>giving_cause</b><br/>Science → Astronomy"]
+        TCAT["<b>giving_team_category</b><br/>Class Year → 2014"]
+    end
+
+    ORDER[("WC Order<br/>$100 donation")]
+
+    MATCH -.->|_giving_match_campaign_id| CAMP
+    TEAM  -.->|_giving_team_campaigns array| CAMP
+    BEN   -.->|_giving_beneficiary_campaigns array| CAMP
+    CHAL  -.->|_giving_challenge_campaigns array| CAMP
+
+    BEN  -->|tagged with| CAUSE
+    TEAM -->|tagged with| TCAT
+
+    ORDER -->|_giving_campaign_id| CAMP
+    ORDER -->|_giving_team_id| TEAM
+    ORDER -->|_giving_beneficiary_id| BEN
+```
+
+### 1. `giving_campaign` — the event instance
+
+One per event run. Recreated every year.
+
+```
+Title:   Awesome Giving Day 2026
+Post ID: 501
+
+Meta:
+  _giving_pre_event_start  = 2026-02-20T00:00:00-05:00    # countdown starts
+  _giving_start_datetime   = 2026-03-12T00:00:00-05:00    # event opens
+  _giving_end_datetime     = 2026-03-13T00:00:00-05:00    # 24h later
+  _giving_timezone         = America/New_York
+  _giving_goal_amount      = 10,000,000
+  _giving_currency         = USD
+  _giving_donation_products = [ 847 ]
+```
+
+Next year: a brand-new post (`Awesome Giving Day 2027`, ID 502). Nothing else is cloned.
+
+### 2. `giving_cause` — browsable category tree (taxonomy)
+
+The top-level buttons on the "Give to a cause" page.
+
+```
+Arts & Humanities
+  ├─ Music
+  └─ Visual Arts
+Science
+  ├─ Animal Health
+  ├─ Astronomy
+  └─ Environmental
+Athletics
+Community & Outreach
+```
+
+Terms are permanent — they persist across every Giving Day.
+
+### 3. `giving_beneficiary` — *what* gets funded
+
+The destination of a donation. Long-lived; participates in many campaigns.
+
+```
+Title:    Center for Planetary Studies
+Post ID:  612
+
+Meta:
+  _giving_beneficiary_campaigns    = [ 501, 502 ]
+  _giving_beneficiary_goal_amount  = 250,000
+  _giving_beneficiary_parent_org   = "College of Arts & Sciences"
+
+Taxonomy (giving_cause):
+  - Science
+  - Astronomy
+```
+
+Two more, to make the pattern obvious:
+
+```
+Post 613 — "Sustainable Agriculture Institute"
+  campaigns  = [ 501, 502 ]
+  parent_org = "College of Agriculture"
+  causes     = [ Science, Environmental ]
+
+Post 614 — "University Concert Series"
+  campaigns  = [ 501 ]                    # only 2026 this year
+  parent_org = "College of Arts & Sciences"
+  causes     = [ Arts & Humanities, Music ]
+```
+
+### 4. `giving_team_category` — leaderboard tabs (taxonomy)
+
+Top-level terms are the tabs. Child terms are the buckets inside each tab.
+
+```
+Class Year
+  ├─ 2014
+  ├─ 2015
+  └─ 2016
+Athletic
+  ├─ Rowing
+  ├─ Soccer
+  └─ Track
+Department
+  ├─ Engineering
+  └─ Arts & Sciences
+```
+
+The **Leaderboard Tabs** block reads this tree and builds `[ All Areas | Class Year | Athletic | Department ]` automatically.
+
+### 5. `giving_team` — *who* is raising
+
+A group of people fundraising. Long-lived.
+
+```
+Title:    Class of 2014 Crew
+Post ID:  701
+
+Meta:
+  _giving_team_campaigns   = [ 501, 502 ]
+  _giving_captain_user_id  = 33
+  _giving_team_goal_amount = 50,000
+
+Taxonomy (giving_team_category):
+  - Class Year → 2014
+  - Department → Arts & Sciences           # a Team can carry multiple tags
+```
+
+More examples:
+
+```
+Post 702 — "Soccer Alumni"
+  campaigns = [ 501, 502 ]
+  team_category = [ Athletic → Soccer ]
+
+Post 703 — "Engineering Faculty & Staff"
+  campaigns = [ 501 ]
+  team_category = [ Department → Engineering ]
+```
+
+### 6. `giving_match` — sponsor match (per campaign)
+
+A one-off pledge. Tied to a single campaign; does **not** carry across years.
+
+```
+Title:   Trustees' Power Hour Match
+Post ID: 801
+
+Meta:
+  _giving_match_campaign_id = 501                          # only Giving Day 2026
+  _giving_match_sponsor     = "Board of Trustees"
+  _giving_match_multiplier  = 2                            # dollar-for-dollar
+  _giving_match_cap_amount  = 500,000
+  _giving_match_start       = 2026-03-12T12:00:00-05:00
+  _giving_match_end         = 2026-03-12T13:00:00-05:00
+  _giving_match_active      = true
+```
+
+### 7. `giving_challenge` — reusable mini-event
+
+Template-like. "Power Hour" happens every year at the same *relative* time.
+
+```
+Title:   Power Hour — First Hour Rush
+Post ID: 901
+
+Meta:
+  _giving_challenge_campaigns         = [ 501, 502 ]
+  _giving_challenge_type              = donation_count
+  _giving_challenge_threshold         = 500                # first 500 donations
+  _giving_challenge_reward_label      = "Unlock $25k from the Parents Council"
+  _giving_challenge_reward_amount     = 25,000
+  _giving_challenge_window_offset_start = PT0H             # at campaign start
+  _giving_challenge_window_offset_end   = PT1H             # for 1 hour
+```
+
+The Aggregator resolves the window per campaign:
+
+- Campaign 501 → `2026-03-12 00:00 → 01:00 ET`
+- Campaign 502 → `2027-03-11 00:00 → 01:00 ET`
+
+Same Challenge post; two different absolute windows; zero duplication.
+
+### Putting it together — one donation, many views
+
+A donor gives $100 on March 12, 2026 at 12:30 PM:
+
+```
+WC Order 9001
+  line item: donation product 847, amount $100
+
+Order meta written by the plugin:
+  _giving_campaign_id    = 501     → Awesome Giving Day 2026
+  _giving_team_id        = 701     → Class of 2014 Crew
+  _giving_beneficiary_id = 612     → Center for Planetary Studies
+```
+
+That single row feeds every block:
+
+| Question | How it's answered |
+|----------|-------------------|
+| Goal progress for Campaign 501 | `SUM(amount) WHERE campaign = 501` — includes this $100 |
+| Top Teams leaderboard | Groups by `_giving_team_id` → +$100 for team 701 |
+| Top Beneficiaries | Groups by `_giving_beneficiary_id` → +$100 for 612 |
+| Top Causes | Joins beneficiary 612 → causes `[Science, Astronomy]` → +$100 to both |
+| "Class Year" tab sub-leaderboard | Joins team 701 → `giving_team_category` term "2014" → +$100 in the 2014 bucket |
+| Match 801 (Trustees' Power Hour) | Order time falls in `12:00–13:00` → 2× match credited |
+| Challenge 901 on Campaign 501 | Order time falls in `PT0H–PT1H` resolved window → counts toward 500-donation threshold |
+
+### Why Team ≠ Beneficiary
+
+They're deliberately separate because the same donation has two independent sides:
+
+- **Class of 2014 Crew** gets *credit* for raising $100 (team leaderboard).
+- **Center for Planetary Studies** gets the actual *dollars* (beneficiary leaderboard, real money flow).
+
+A donor from the Class of 2014 can designate their gift to *any* beneficiary — the concert series, the agriculture institute, the planetary studies center. Conflating team and destination into one CPT would force every beneficiary to belong to one fundraising group, which isn't how fundraisers operate.
+
 ## License
 
 This plugin is licensed under the **GNU General Public License v2.0 or later** 
