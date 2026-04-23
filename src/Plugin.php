@@ -13,6 +13,7 @@ use Team51\GivingDay\PostTypes\Campaign;
 use Team51\GivingDay\PostTypes\Challenge;
 use Team51\GivingDay\PostTypes\GivingMatch;
 use Team51\GivingDay\PostTypes\Team;
+use Team51\GivingDay\Setup\MockData;
 use Team51\GivingDay\Taxonomies\Cause;
 use Team51\GivingDay\Taxonomies\TeamCategory;
 
@@ -74,6 +75,13 @@ final class Plugin {
 	 * @var TeamCategory|null
 	 */
 	public ?TeamCategory $team_category = null;
+
+	/**
+	 * First-activation sample data seeder.
+	 *
+	 * @var MockData|null
+	 */
+	public ?MockData $mock_data = null;
 
 	/**
 	 * Plugin constructor. Kept protected to enforce the singleton pattern.
@@ -143,5 +151,8 @@ final class Plugin {
 
 		$this->team_category = new TeamCategory();
 		$this->team_category->register();
+
+		$this->mock_data = new MockData();
+		$this->mock_data->register();
 	}
 }

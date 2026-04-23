@@ -119,3 +119,23 @@ add_action(
 		}
 	}
 );
+
+/**
+ * Flag a "seed sample data on first run" marker at activation time.
+ *
+ * The activation callback fires after `init` has already run for the
+ * current admin request, so our CPTs/taxonomies aren't registered yet —
+ * the actual seeding runs on the next request via `MockData::maybe_seed()`
+ * (hooked on `admin_init`). We just raise an option flag here.
+ */
+register_activation_hook(
+	__FILE__,
+	static function () {
+		// Option name duplicated (rather than referencing the class constant)
+		// so activation never depends on the composer autoloader having been
+		// loaded yet — this runs before plugins_loaded on a clean boot.
+		if ( false === get_option( 'giving_day_blocks_seeded_ids', false ) ) {
+			update_option( 'giving_day_blocks_pending_seed', 1, false );
+		}
+	}
+);
