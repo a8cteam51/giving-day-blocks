@@ -3,7 +3,7 @@
  * The Giving Day Blocks bootstrap file.
  *
  * @since       0.1.0
- * @version     0.1.0
+ * @version     0.1.1
  * @author      Team51 Special Projects
  * @license     GPL-3.0-or-later
  *
