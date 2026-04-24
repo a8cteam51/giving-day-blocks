@@ -12,6 +12,19 @@ import { useCampaignSummary } from '../_shared/hooks/useCampaignSummary';
 import { useCampaignStatus } from '../_shared/hooks/useCampaignStatus';
 import { formatCurrency, formatNumber } from '../_shared/utils/formatCurrency';
 
+function parseJSON( raw, fallback )
+{
+    if (! raw ) {
+        return fallback;
+    }
+    try {
+        const parsed = JSON.parse(raw);
+        return parsed ?? fallback;
+    } catch ( e ) {
+        return fallback;
+    }
+}
+
 function Totals( { root } )
 {
     const campaignId = Number(root.dataset.campaignId);
@@ -20,12 +33,14 @@ function Totals( { root } )
     const showDonors = root.dataset.showDonorCount === '1';
     const headline = root.dataset.headline || '';
     const subhead = root.dataset.subhead || '';
-    const labels = JSON.parse(root.dataset.labels || '{}');
+    const labels = parseJSON(root.dataset.labels, {});
+    const initialData = parseJSON(root.dataset.initial, null);
 
     const { status } = useCampaignStatus(campaignId);
     const { data } = useCampaignSummary(
         campaignId, {
             intervalMs: status === 'live' ? 15000 : 60000,
+            initialData,
         } 
     );
 

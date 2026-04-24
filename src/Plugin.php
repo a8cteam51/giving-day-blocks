@@ -153,6 +153,10 @@ final class Plugin {
 	 * @return void
 	 */
 	public function initialize(): void {
+		if ( null !== $this->campaign ) {
+			return;
+		}
+
 		$this->campaign = new Campaign();
 		$this->campaign->register();
 

@@ -56,6 +56,18 @@ $currency      = (string) ( '' !== $currency_meta ? $currency_meta : get_option(
 $start = get_post_meta($campaign_id, Campaign::META_START_DATETIME, true);
 $end   = get_post_meta($campaign_id, Campaign::META_END_DATETIME, true);
 
+// Status::resolve() can land on SCHEDULED/LIVE without the matching boundary
+// datetime (preview override, _giving_status_override meta, or a pre-event
+// window with no explicit start). Resolve and validate the countdown target
+// here so we never ship markup with an empty data-target.
+$target = '';
+if (Status::SCHEDULED === $status ) {
+    $target = (string) $start;
+} elseif (Status::LIVE === $status ) {
+    $target = (string) $end;
+}
+$has_target = '' !== $target && false !== strtotime($target);
+
 $headline = '';
 switch ( $status ) {
 case Status::SCHEDULED:
@@ -118,14 +130,13 @@ $formatter = static function ( $amount ) use ( $currency ) {
             <p class="giving-day-countdown__headline"><?php echo esc_html($headline); ?></p>
         <?php endif; ?>
 
-        <?php if (Status::SCHEDULED === $status ) : ?>
-            <?php $target = $start; ?>
-            <div class="giving-day-countdown__countdown" data-target="<?php echo esc_attr((string) $target); ?>">
-                <noscript><?php echo esc_html(sprintf(/* translators: %s: ISO datetime */ __('Starts %s', 'giving-day-blocks'), (string) $target)); ?></noscript>
+        <?php if ($has_target && Status::SCHEDULED === $status ) : ?>
+            <div class="giving-day-countdown__countdown" data-target="<?php echo esc_attr($target); ?>">
+                <noscript><?php echo esc_html(sprintf(/* translators: %s: ISO datetime */ __('Starts %s', 'giving-day-blocks'), $target)); ?></noscript>
             </div>
-        <?php elseif (Status::LIVE === $status ) : ?>
-            <div class="giving-day-countdown__countdown" data-target="<?php echo esc_attr((string) $end); ?>">
-                <noscript><?php echo esc_html(sprintf(/* translators: %s: ISO datetime */ __('Ends %s', 'giving-day-blocks'), (string) $end)); ?></noscript>
+        <?php elseif ($has_target && Status::LIVE === $status ) : ?>
+            <div class="giving-day-countdown__countdown" data-target="<?php echo esc_attr($target); ?>">
+                <noscript><?php echo esc_html(sprintf(/* translators: %s: ISO datetime */ __('Ends %s', 'giving-day-blocks'), $target)); ?></noscript>
             </div>
         <?php else : ?>
             <p class="giving-day-countdown__final"><?php echo esc_html($formatter($raised)); ?></p>

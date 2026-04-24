@@ -22,6 +22,7 @@ use Team51\GivingDay\Data\Colors;
 use Team51\GivingDay\Data\Status;
 use Team51\GivingDay\PostTypes\Campaign;
 use WP_Error;
+use WP_Post;
 use WP_REST_Request;
 use WP_REST_Response;
 use WP_REST_Server;
@@ -89,14 +90,9 @@ final class REST {
 	 */
 	public function get_countdown( WP_REST_Request $request ) {
 		$campaign_id = (int) $request['id'];
-		$campaign    = get_post( $campaign_id );
-
-		if ( ! $campaign || Campaign::POST_TYPE !== $campaign->post_type ) {
-			return new WP_Error(
-				'giving_day_blocks_campaign_not_found',
-				__( 'Campaign not found.', 'giving-day-blocks' ),
-				array( 'status' => 404 )
-			);
+		$campaign    = $this->locate_readable_campaign( $campaign_id );
+		if ( is_wp_error( $campaign ) ) {
+			return $campaign;
 		}
 
 		$override = $this->preview_override_from_request( $request );
@@ -123,14 +119,9 @@ final class REST {
 	 */
 	public function get_summary( WP_REST_Request $request ) {
 		$campaign_id = (int) $request['id'];
-		$campaign    = get_post( $campaign_id );
-
-		if ( ! $campaign || Campaign::POST_TYPE !== $campaign->post_type ) {
-			return new WP_Error(
-				'giving_day_blocks_campaign_not_found',
-				__( 'Campaign not found.', 'giving-day-blocks' ),
-				array( 'status' => 404 )
-			);
+		$campaign    = $this->locate_readable_campaign( $campaign_id );
+		if ( is_wp_error( $campaign ) ) {
+			return $campaign;
 		}
 
 		$override = $this->preview_override_from_request( $request );
@@ -161,6 +152,42 @@ final class REST {
 		);
 
 		return $this->respond( $payload );
+	}
+
+	/**
+	 * Loads a campaign the current caller is allowed to read.
+	 *
+	 * Returns the post when it exists, is a Campaign, and is either
+	 * published or readable by the current user. Otherwise returns a
+	 * generic 404 — we deliberately never surface a 403 for unpublished
+	 * IDs so anonymous callers cannot enumerate draft/private campaigns
+	 * by probing status codes.
+	 *
+	 * Published campaigns are public. Any other status (draft, private,
+	 * pending, future, trash, auto-draft) requires the `read_post` meta
+	 * capability for that specific post, which WordPress maps through
+	 * `map_meta_cap()` to `edit_post` or `read_private_{cpt}` depending
+	 * on status.
+	 *
+	 * @param int $campaign_id
+	 * @return WP_Post|WP_Error
+	 */
+	private function locate_readable_campaign( int $campaign_id ) {
+		$campaign = get_post( $campaign_id );
+
+		if (
+			! $campaign
+			|| Campaign::POST_TYPE !== $campaign->post_type
+			|| ( 'publish' !== $campaign->post_status && ! current_user_can( 'read_post', $campaign->ID ) )
+		) {
+			return new WP_Error(
+				'giving_day_blocks_campaign_not_found',
+				__( 'Campaign not found.', 'giving-day-blocks' ),
+				array( 'status' => 404 )
+			);
+		}
+
+		return $campaign;
 	}
 
 	/**
