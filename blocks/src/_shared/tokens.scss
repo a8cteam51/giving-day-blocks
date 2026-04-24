@@ -1,0 +1,40 @@
+// Shared design tokens.
+//
+// Thin wrappers over theme.json CSS custom properties so blocks can consume
+// the site palette without hardcoded colors/fonts. Plus a media() mixin.
+
+// Breakpoints mirror WordPress admin.
+$giving-day-bp-sm: 600px;
+$giving-day-bp-md: 782px;
+$giving-day-bp-lg: 1080px;
+
+@mixin media($bp) {
+	@if $bp == sm {
+		@media (min-width: $giving-day-bp-sm) {
+			@content;
+		}
+	} @else if $bp == md {
+		@media (min-width: $giving-day-bp-md) {
+			@content;
+		}
+	} @else if $bp == lg {
+		@media (min-width: $giving-day-bp-lg) {
+			@content;
+		}
+	}
+}
+
+@mixin reduced-motion {
+	@media (prefers-reduced-motion: reduce) {
+		@content;
+	}
+}
+
+:root {
+	--giving-day-primary: var(--wp--preset--color--primary, #1855cf);
+	--giving-day-secondary: var(--wp--preset--color--secondary, #111);
+	--giving-day-surface: var(--wp--preset--color--background, #fff);
+	--giving-day-muted: var(--wp--preset--color--tertiary, #6b7280);
+	--giving-day-accent: var(--wp--preset--color--accent, #f59e0b);
+	--giving-day-radius: 12px;
+}

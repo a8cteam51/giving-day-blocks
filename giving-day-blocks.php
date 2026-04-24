@@ -3,7 +3,7 @@
  * The Giving Day Blocks bootstrap file.
  *
  * @since       0.1.0
- * @version     0.1.0
+ * @version     0.1.1
  * @author      Team51 Special Projects
  * @license     GPL-3.0-or-later
  *
@@ -11,7 +11,7 @@
  * Plugin Name:             Giving Day Blocks
  * Plugin URI:              https://github.com/a8cteam51/giving-day-blocks
  * Description:             An out-of-the-box Giving Day product for WooCommerce. Blocks, data layer, and admin dashboard for running a fundraiser event. Requires team51-donations.
- * Version:                 0.1.0
+ * Version:                 0.1.1
  * Requires at least:       6.4
  * Requires PHP:            8.1
  * Author:                  Team51 Special Projects

@@ -1,0 +1,78 @@
+@import "../_shared/tokens";
+
+.giving-day-countdown {
+	border-radius: var(--giving-day-radius);
+	padding: 1.5rem;
+	text-align: center;
+	background: var(--giving-day-surface);
+	color: var(--giving-day-secondary);
+
+	&--empty {
+		border: 2px dashed var(--giving-day-muted);
+		color: var(--giving-day-muted);
+		padding: 2rem 1rem;
+	}
+
+	&__headline {
+		font-size: 1.125rem;
+		font-weight: 600;
+		margin: 0 0 1rem;
+		color: var(--giving-day-muted);
+		text-transform: uppercase;
+		letter-spacing: 0.04em;
+	}
+
+	&__countdown {
+		display: flex;
+		flex-wrap: wrap;
+		justify-content: center;
+		gap: 0.5rem 1rem;
+		margin-bottom: 1rem;
+
+		@include media(sm) {
+			gap: 1rem 1.5rem;
+		}
+	}
+
+	&__unit {
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		min-width: 3.5rem;
+	}
+
+	&__value {
+		font-size: clamp(2rem, 6vw, 3.5rem);
+		font-weight: 700;
+		line-height: 1;
+		font-variant-numeric: tabular-nums;
+		color: var(--giving-day-primary);
+	}
+
+	&__label {
+		margin-top: 0.25rem;
+		font-size: 0.75rem;
+		text-transform: uppercase;
+		letter-spacing: 0.08em;
+		color: var(--giving-day-muted);
+	}
+
+	&__donors {
+		margin-top: 0.75rem;
+		font-size: 0.9rem;
+		color: var(--giving-day-muted);
+	}
+
+	&__final {
+		font-size: clamp(2.5rem, 8vw, 4.5rem);
+		font-weight: 800;
+		line-height: 1;
+		margin: 0.5rem 0;
+		color: var(--giving-day-primary);
+	}
+
+	&__final-meta {
+		margin: 0;
+		color: var(--giving-day-muted);
+	}
+}

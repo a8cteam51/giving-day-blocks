@@ -8,6 +8,7 @@
 
 namespace Team51\GivingDay;
 
+use Team51\GivingDay\Admin\CampaignEditor;
 use Team51\GivingDay\PostTypes\Beneficiary;
 use Team51\GivingDay\PostTypes\Campaign;
 use Team51\GivingDay\PostTypes\Challenge;
@@ -84,6 +85,27 @@ final class Plugin {
 	public ?MockData $mock_data = null;
 
 	/**
+	 * REST API router.
+	 *
+	 * @var REST|null
+	 */
+	public ?REST $rest = null;
+
+	/**
+	 * Block registrar.
+	 *
+	 * @var Blocks|null
+	 */
+	public ?Blocks $blocks = null;
+
+	/**
+	 * Campaign edit screen UI (Gutenberg sidebar panel).
+	 *
+	 * @var CampaignEditor|null
+	 */
+	public ?CampaignEditor $campaign_editor = null;
+
+	/**
 	 * Plugin constructor. Kept protected to enforce the singleton pattern.
 	 */
 	protected function __construct() {
@@ -131,6 +153,10 @@ final class Plugin {
 	 * @return void
 	 */
 	public function initialize(): void {
+		if ( null !== $this->campaign ) {
+			return;
+		}
+
 		$this->campaign = new Campaign();
 		$this->campaign->register();
 
@@ -154,5 +180,14 @@ final class Plugin {
 
 		$this->mock_data = new MockData();
 		$this->mock_data->register();
+
+		$this->rest = new REST();
+		$this->rest->register();
+
+		$this->blocks = new Blocks();
+		$this->blocks->register();
+
+		$this->campaign_editor = new CampaignEditor();
+		$this->campaign_editor->register();
 	}
 }

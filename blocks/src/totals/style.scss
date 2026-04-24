@@ -1,0 +1,45 @@
+@import "../_shared/tokens";
+
+.giving-day-totals {
+	text-align: center;
+	padding: 1.5rem;
+	border-radius: var(--giving-day-radius);
+	background: var(--giving-day-surface);
+	color: var(--giving-day-secondary);
+
+	&__headline {
+		margin: 0 0 0.5rem;
+		font-size: 1rem;
+		color: var(--giving-day-muted);
+		text-transform: uppercase;
+		letter-spacing: 0.06em;
+	}
+
+	&__amount {
+		margin: 0;
+		font-size: clamp(2.5rem, 8vw, 4.5rem);
+		font-weight: 800;
+		line-height: 1.05;
+		color: var(--giving-day-primary);
+		font-variant-numeric: tabular-nums;
+	}
+
+	&__goal,
+	&__donors {
+		margin: 0.25rem 0 0;
+		color: var(--giving-day-muted);
+	}
+
+	&__subhead {
+		margin-top: 0.75rem;
+		font-size: 0.95rem;
+		color: var(--giving-day-secondary);
+	}
+
+	&__mode-hint {
+		margin-top: 0.75rem;
+		font-size: 0.75rem;
+		color: var(--giving-day-muted);
+		font-style: italic;
+	}
+}
