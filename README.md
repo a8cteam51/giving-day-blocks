@@ -4,14 +4,13 @@ An out-of-the-box, open-source **Giving Day** product for WooCommerce. A set of 
 
 ## What you get
 
-Eight blocks designed to work together during a Giving Day event:
+Seven blocks designed to work together during a Giving Day event:
 
 | Block | Purpose |
 |-------|---------|
 | `giving-day/goal-progress` | Real-time visual tracker toward a fundraising goal. Horizontal and vertical layouts. |
-| `giving-day/countdown-pre` | Pre-event countdown that builds anticipation, then hands off at 00:00:00. |
-| `giving-day/countdown-event` | Event-day countdown (24h or custom). Appears automatically when the pre-event countdown finishes. |
-| `giving-day/totals-post` | Final totals shown once the event ends. Replaces the countdown in place. |
+| `giving-day/countdown` | Unified hero slot. Pre-event countdown → event-day countdown → final totals, transitioning automatically on `server_time`. Toggle `hidePostEvent` to pair with a standalone Totals block elsewhere. |
+| `giving-day/totals` | Standalone totals. `mode: auto` shows the running number while live and the final once the event ends; `mode: final-only` stays hidden until the event ends. |
 | `giving-day/leaderboard` | Top donors, teams, campaigns, or causes. Configurable dimension and size. |
 | `giving-day/match-my-gift` | Sponsor matching banner that doubles donation urgency. |
 | `giving-day/challenges` | Time-boxed mini-events (e.g. "50 donations in the next hour unlocks $10,000"). |
@@ -126,15 +125,41 @@ wp post delete $(wp post list --post_type=giving_campaign,giving_team,giving_ben
 ### Scripts
 
 ```bash
-npm run start     # Watch mode for blocks (wp-scripts)
-npm run build     # Production build into blocks/build/
-npm test          # Run Jest suite
+npm run start         # Watch mode for blocks
+npm run start:admin   # Watch mode for the Campaign sidebar bundle
+npm run build         # Production build: blocks + admin bundle
+npm test              # Run Jest suite
 npm run test:watch
-npm run lint      # ESLint + Stylelint + pkg-json
-npm run format    # Auto-fix JS/SCSS
+npm run lint          # ESLint + Stylelint + pkg-json
+npm run format        # Auto-fix JS/SCSS
 composer run lint:php
 composer run format:php
 ```
+
+### Previewing event states
+
+The `countdown` and `totals` blocks accept a `?givingday=` URL parameter that forces a specific state, for editors who want to preview a page mid-development:
+
+| Value | Forced state |
+|-------|--------------|
+| `?givingday=pre` | Pre-event countdown (scheduled) |
+| `?givingday=live` | Event-day countdown + running total |
+| `?givingday=post` | Ended — final totals |
+
+The override is **only honored for logged-in users** (server-side `is_user_logged_in()` / client-side `body.logged-in`). Anonymous visitors with the parameter see the real state. Each block also has an **Editor preview state** dropdown in the inspector that does the same thing inside the editor canvas.
+
+Until the WooCommerce-order Aggregator lands, the running-raised number is driven by two temporary meta fields on the Campaign — **Dev: raised override** and **Dev: donor count override** — editable from the Campaign sidebar. Both are removed in favor of real aggregation later without changing the block markup.
+
+### Per-campaign brand colors
+
+The **Brand colors** panel on the Campaign edit screen lets each event define its own palette: Primary, Secondary, Accent, Surface, and Muted. Each field writes a hex value to meta, and `render.php` emits them on the block wrapper as inline CSS custom properties:
+
+```html
+<div class="giving-day-countdown …"
+     style="--giving-day-primary: #e5007d; --giving-day-accent: #ffb400;">
+```
+
+`blocks/src/_shared/tokens.scss` already declares `--giving-day-*` with a `theme.json` fallback, so any cleared field transparently returns to the site-wide default. Editor previews use the same mechanism via `campaignColorStyle()` (`blocks/src/_shared/utils/campaignColorStyle.js`) so what you see in the canvas matches the front end. Since the override lives on the block wrapper, two campaigns on the same page can use different palettes without collision.
 
 ### Conventions
 

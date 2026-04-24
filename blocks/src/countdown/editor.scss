@@ -1,0 +1,9 @@
+@import "./style";
+
+.wp-block[data-type="giving-day/countdown"] {
+	.giving-day-countdown {
+		&[data-status="ended"] {
+			border: 1px dashed rgba(0, 0, 0, 0.12);
+		}
+	}
+}

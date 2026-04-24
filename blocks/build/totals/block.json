@@ -1,0 +1,69 @@
+{
+  "$schema": "https://schemas.wp.org/trunk/block.json",
+  "apiVersion": 3,
+  "name": "giving-day/totals",
+  "version": "0.1.0",
+  "title": "Giving Day: Totals",
+  "category": "widgets",
+  "icon": "chart-bar",
+  "description": "Standalone totals block. Shows running totals while live and the final number once the event ends.",
+  "keywords": [
+    "giving day",
+    "totals",
+    "raised",
+    "goal"
+  ],
+  "textdomain": "giving-day-blocks",
+  "supports": {
+    "html": false,
+    "color": {
+      "background": true,
+      "text": true
+    },
+    "spacing": {
+      "margin": true,
+      "padding": true
+    },
+    "typography": {
+      "fontSize": true
+    },
+    "align": [
+      "wide",
+      "full"
+    ]
+  },
+  "attributes": {
+    "campaignId": {
+      "type": "number"
+    },
+    "mode": {
+      "type": "string",
+      "default": "auto",
+      "enum": [
+        "auto",
+        "final-only"
+      ]
+    },
+    "headline": {
+      "type": "string",
+      "default": "Together we raised"
+    },
+    "subhead": {
+      "type": "string",
+      "default": ""
+    },
+    "showDonorCount": {
+      "type": "boolean",
+      "default": true
+    },
+    "showGoal": {
+      "type": "boolean",
+      "default": true
+    }
+  },
+  "editorScript": "file:./index.js",
+  "viewScript": "file:./view.js",
+  "style": "file:./style-index.css",
+  "editorStyle": "file:./index.css",
+  "render": "file:./render.php"
+}
