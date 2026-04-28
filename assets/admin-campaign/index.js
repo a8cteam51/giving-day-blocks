@@ -45,18 +45,25 @@ const TIMEZONE_CHOICES = [
 ];
 
 function DateTimeField( { label, value, onChange, help } ) {
-	const display = value ? new Date( value ).toLocaleString() : __( 'Not set', 'giving-day-blocks' );
+	const display = value
+		? new Date( value ).toLocaleString()
+		: __( 'Not set', 'giving-day-blocks' );
 	return (
 		<PanelRow>
 			<div style={ { width: '100%' } }>
-				<div style={ { fontWeight: 600, marginBottom: 4 } }>{ label }</div>
+				<div style={ { fontWeight: 600, marginBottom: 4 } }>
+					{ label }
+				</div>
 				<Dropdown
 					renderToggle={ ( { isOpen, onToggle } ) => (
 						<Button
 							variant="secondary"
 							onClick={ onToggle }
 							aria-expanded={ isOpen }
-							style={ { width: '100%', justifyContent: 'space-between' } }
+							style={ {
+								width: '100%',
+								justifyContent: 'space-between',
+							} }
 						>
 							{ display }
 						</Button>
@@ -100,12 +107,19 @@ function DateTimeField( { label, value, onChange, help } ) {
  * Single swatch + popover picker that writes a hex string into the given
  * meta key. Clearing the value falls back to the theme.json token, so
  * "empty" is a valid, meaningful state.
+ * @param root0
+ * @param root0.label
+ * @param root0.value
+ * @param root0.onChange
+ * @param root0.help
  */
 function ColorField( { label, value, onChange, help } ) {
 	return (
 		<PanelRow>
 			<div style={ { width: '100%' } }>
-				<div style={ { fontWeight: 600, marginBottom: 4 } }>{ label }</div>
+				<div style={ { fontWeight: 600, marginBottom: 4 } }>
+					{ label }
+				</div>
 				<Dropdown
 					contentClassName="giving-day-campaign-color-picker"
 					renderToggle={ ( { isOpen, onToggle } ) => (
@@ -119,9 +133,15 @@ function ColorField( { label, value, onChange, help } ) {
 								gap: 8,
 							} }
 						>
-							<ColorIndicator colorValue={ value || 'transparent' } />
+							<ColorIndicator
+								colorValue={ value || 'transparent' }
+							/>
 							<span>
-								{ value || __( 'Use theme default', 'giving-day-blocks' ) }
+								{ value ||
+									__(
+										'Use theme default',
+										'giving-day-blocks'
+									) }
 							</span>
 						</Button>
 					) }
@@ -163,7 +183,11 @@ function CampaignDetailsPanel() {
 		return null;
 	}
 
-	const [ meta, setMeta ] = useEntityProp( 'postType', config.postType, 'meta' );
+	const [ meta, setMeta ] = useEntityProp(
+		'postType',
+		config.postType,
+		'meta'
+	);
 	const updateMeta = ( key, value ) => setMeta( { ...meta, [ key ]: value } );
 
 	const timezoneOptions = ( () => {
@@ -176,7 +200,10 @@ function CampaignDetailsPanel() {
 	} )();
 
 	const statusOptions = [
-		{ label: __( 'Auto (compute from dates)', 'giving-day-blocks' ), value: '' },
+		{
+			label: __( 'Auto (compute from dates)', 'giving-day-blocks' ),
+			value: '',
+		},
 		{ label: __( 'Scheduled', 'giving-day-blocks' ), value: 'scheduled' },
 		{ label: __( 'Live', 'giving-day-blocks' ), value: 'live' },
 		{ label: __( 'Ended', 'giving-day-blocks' ), value: 'ended' },
@@ -191,7 +218,9 @@ function CampaignDetailsPanel() {
 			<DateTimeField
 				label={ __( 'Pre-event start', 'giving-day-blocks' ) }
 				value={ meta?.[ META_KEYS.preEventStart ] || '' }
-				onChange={ ( value ) => updateMeta( META_KEYS.preEventStart, value || '' ) }
+				onChange={ ( value ) =>
+					updateMeta( META_KEYS.preEventStart, value || '' )
+				}
 				help={ __(
 					'When the pre-event countdown begins. Leave empty to skip the pre-event state.',
 					'giving-day-blocks'
@@ -201,20 +230,30 @@ function CampaignDetailsPanel() {
 			<DateTimeField
 				label={ __( 'Event start', 'giving-day-blocks' ) }
 				value={ meta?.[ META_KEYS.startDatetime ] || '' }
-				onChange={ ( value ) => updateMeta( META_KEYS.startDatetime, value || '' ) }
+				onChange={ ( value ) =>
+					updateMeta( META_KEYS.startDatetime, value || '' )
+				}
 			/>
 
 			<DateTimeField
 				label={ __( 'Event end', 'giving-day-blocks' ) }
 				value={ meta?.[ META_KEYS.endDatetime ] || '' }
-				onChange={ ( value ) => updateMeta( META_KEYS.endDatetime, value || '' ) }
+				onChange={ ( value ) =>
+					updateMeta( META_KEYS.endDatetime, value || '' )
+				}
 			/>
 
 			<SelectControl
 				label={ __( 'Timezone', 'giving-day-blocks' ) }
-				value={ meta?.[ META_KEYS.timezone ] || config.defaultTimezone || 'UTC' }
+				value={
+					meta?.[ META_KEYS.timezone ] ||
+					config.defaultTimezone ||
+					'UTC'
+				}
 				options={ timezoneOptions }
-				onChange={ ( value ) => updateMeta( META_KEYS.timezone, value ) }
+				onChange={ ( value ) =>
+					updateMeta( META_KEYS.timezone, value )
+				}
 				__next40pxDefaultSize
 				__nextHasNoMarginBottom
 			/>
@@ -225,7 +264,10 @@ function CampaignDetailsPanel() {
 				min={ 0 }
 				step={ 1 }
 				onChange={ ( value ) =>
-					updateMeta( META_KEYS.goalAmount, value === '' ? 0 : Number( value ) )
+					updateMeta(
+						META_KEYS.goalAmount,
+						value === '' ? 0 : Number( value )
+					)
 				}
 				__next40pxDefaultSize
 			/>
@@ -236,7 +278,9 @@ function CampaignDetailsPanel() {
 						{ __( 'Currency', 'giving-day-blocks' ) }
 					</div>
 					<code>
-						{ meta?.[ META_KEYS.currency ] || config.storeCurrency || 'USD' }
+						{ meta?.[ META_KEYS.currency ] ||
+							config.storeCurrency ||
+							'USD' }
 					</code>
 					<p style={ { fontSize: 12, color: '#555', marginTop: 4 } }>
 						{ __(
@@ -253,7 +297,9 @@ function CampaignDetailsPanel() {
 					'Comma-separated WooCommerce product IDs that feed this campaign.',
 					'giving-day-blocks'
 				) }
-				value={ ( meta?.[ META_KEYS.donationProducts ] || [] ).join( ', ' ) }
+				value={ ( meta?.[ META_KEYS.donationProducts ] || [] ).join(
+					', '
+				) }
 				onChange={ ( value ) => {
 					const ids = value
 						.split( ',' )
@@ -269,7 +315,9 @@ function CampaignDetailsPanel() {
 				label={ __( 'Status override', 'giving-day-blocks' ) }
 				value={ meta?.[ META_KEYS.statusOverride ] || '' }
 				options={ statusOptions }
-				onChange={ ( value ) => updateMeta( META_KEYS.statusOverride, value ) }
+				onChange={ ( value ) =>
+					updateMeta( META_KEYS.statusOverride, value )
+				}
 				help={ __(
 					'Force a state for previews. Leave on Auto for normal event behavior.',
 					'giving-day-blocks'
@@ -331,7 +379,11 @@ function CampaignColorsPanel() {
 		return null;
 	}
 
-	const [ meta, setMeta ] = useEntityProp( 'postType', config.postType, 'meta' );
+	const [ meta, setMeta ] = useEntityProp(
+		'postType',
+		config.postType,
+		'meta'
+	);
 	const updateMeta = ( key, value ) => setMeta( { ...meta, [ key ]: value } );
 
 	const colorRows = [
@@ -395,7 +447,10 @@ function CampaignColorsPanel() {
 							updateMeta( row.key, '' );
 							return;
 						}
-						const hex = typeof value === 'string' ? value : value?.hex || '';
+						const hex =
+							typeof value === 'string'
+								? value
+								: value?.hex || '';
 						updateMeta( row.key, hex );
 					} }
 				/>

@@ -1,0 +1,11 @@
+@import "./style";
+
+.wp-block[data-type="giving-day/goal-progress"] {
+	.giving-day-goal-progress {
+		border: 1px dashed rgba(0, 0, 0, 0.12);
+	}
+
+	.giving-day-goal-progress__notice {
+		margin: 0 0 0.75rem;
+	}
+}

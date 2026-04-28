@@ -11,7 +11,9 @@ describe( 'shouldHideDays', () => {
 	} );
 
 	test( 'returns false for unparseable input', () => {
-		expect( shouldHideDays( 'not-a-date', '2026-05-01T00:00:00Z' ) ).toBe( false );
+		expect( shouldHideDays( 'not-a-date', '2026-05-01T00:00:00Z' ) ).toBe(
+			false
+		);
 	} );
 
 	test( 'returns false when end <= start', () => {

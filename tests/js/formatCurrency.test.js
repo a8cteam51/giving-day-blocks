@@ -1,4 +1,7 @@
-import { formatCurrency, formatNumber } from '../../blocks/src/_shared/utils/formatCurrency';
+import {
+	formatCurrency,
+	formatNumber,
+} from '../../blocks/src/_shared/utils/formatCurrency';
 
 describe( 'formatCurrency', () => {
 	it( 'formats whole dollars without decimals', () => {

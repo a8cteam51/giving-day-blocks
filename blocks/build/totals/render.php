@@ -52,6 +52,16 @@ $labels = array(
     'donors' => __('donors', 'giving-day-blocks'),
 );
 
+// Seeds useCampaignSummary() so the React mount matches the SSR markup
+// and the last-known values survive a failed first fetch. Shape mirrors
+// the /campaign/{id}/summary REST payload fields consumed by view.js.
+$initial = array(
+    'raised'      => $raised,
+    'goal'        => $goal,
+    'currency'    => $currency,
+    'donor_count' => $donors,
+);
+
 $extra = array(
     'class'                 => 'giving-day-totals',
     'data-campaign-id'      => (string) $campaign_id,
@@ -61,6 +71,7 @@ $extra = array(
     'data-headline'         => esc_attr($headline),
     'data-subhead'          => esc_attr($subhead),
     'data-labels'           => esc_attr(wp_json_encode($labels)),
+    'data-initial'          => esc_attr(wp_json_encode($initial)),
 );
 if ($hidden_shell ) {
     $extra['hidden'] = 'hidden';

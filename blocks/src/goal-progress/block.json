@@ -1,0 +1,72 @@
+{
+	"$schema": "https://schemas.wp.org/trunk/block.json",
+	"apiVersion": 3,
+	"name": "giving-day/goal-progress",
+	"version": "0.1.0",
+	"title": "Giving Day: Goal + Progress",
+	"category": "widgets",
+	"icon": "chart-bar",
+	"description": "A horizontal or vertical progress bar showing how close a campaign is to its fundraising goal. Live-refreshes during the event.",
+	"keywords": [
+		"giving day",
+		"progress",
+		"goal",
+		"fundraiser",
+		"thermometer"
+	],
+	"textdomain": "giving-day-blocks",
+	"supports": {
+		"html": false,
+		"color": {
+			"background": true,
+			"text": true
+		},
+		"spacing": {
+			"margin": true,
+			"padding": true
+		},
+		"typography": {
+			"fontSize": true
+		},
+		"align": [ "wide", "full" ]
+	},
+	"attributes": {
+		"campaignId": {
+			"type": "number"
+		},
+		"orientation": {
+			"type": "string",
+			"default": "horizontal",
+			"enum": [ "horizontal", "vertical" ]
+		},
+		"showPercent": {
+			"type": "boolean",
+			"default": true
+		},
+		"showRaised": {
+			"type": "boolean",
+			"default": true
+		},
+		"showGoal": {
+			"type": "boolean",
+			"default": true
+		},
+		"showDonorCount": {
+			"type": "boolean",
+			"default": false
+		},
+		"animateBar": {
+			"type": "boolean",
+			"default": true
+		},
+		"animateNumbers": {
+			"type": "boolean",
+			"default": true
+		}
+	},
+	"editorScript": "file:./index.js",
+	"viewScript": "file:./view.js",
+	"style": "file:./style-index.css",
+	"editorStyle": "file:./index.css",
+	"render": "file:./render.php"
+}

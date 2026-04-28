@@ -7,10 +7,10 @@ import { withPreviewParam } from './usePreviewOverride';
  * backing off on errors.
  *
  * @param {number} campaignId
- * @param {object} [options]
+ * @param {Object} [options]
  * @param {number} [options.intervalMs=30000]
- * @param {object} [options.initialData]
- * @returns {{ data: object|null, error: Error|null, loading: boolean }}
+ * @param {Object} [options.initialData]
+ * @return {{ data: object|null, error: Error|null, loading: boolean }}
  */
 export function useCampaignSummary( campaignId, options = {} ) {
 	const { intervalMs = 30000, initialData = null } = options;
@@ -60,9 +60,14 @@ export function useCampaignSummary( campaignId, options = {} ) {
 				if ( cancelled ) {
 					return;
 				}
-				setError( err instanceof Error ? err : new Error( String( err ) ) );
+				setError(
+					err instanceof Error ? err : new Error( String( err ) )
+				);
 				setLoading( false );
-				backoffRef.current = Math.min( backoffRef.current * 2, 5 * 60 * 1000 );
+				backoffRef.current = Math.min(
+					backoffRef.current * 2,
+					5 * 60 * 1000
+				);
 				schedule( backoffRef.current );
 			}
 		};

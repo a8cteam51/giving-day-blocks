@@ -5,8 +5,8 @@
  *
  * Empty values are skipped so the theme.json fallback in tokens.scss wins.
  *
- * @param {object} meta Flat meta object from useEntityProp / REST.
- * @return {object} React-ready style object (may be empty).
+ * @param {Object} meta Flat meta object from useEntityProp / REST.
+ * @return {Object} React-ready style object (may be empty).
  */
 const META_TO_VAR = {
 	_giving_color_primary: '--giving-day-primary',
