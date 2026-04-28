@@ -23,11 +23,13 @@ export function useCountUp( target, options = {} ) {
 
 	const [ value, setValue ] = useState( safeTarget );
 	const fromRef = useRef( safeTarget );
+	const valueRef = useRef( safeTarget );
 	const rafRef = useRef( null );
 
 	useEffect( () => {
 		if ( ! enabled || prefersReducedMotion() ) {
 			fromRef.current = safeTarget;
+			valueRef.current = safeTarget;
 			setValue( safeTarget );
 			return undefined;
 		}
@@ -44,6 +46,7 @@ export function useCountUp( target, options = {} ) {
 			const progress = Math.min( 1, elapsed / durationMs );
 			const eased = easeOutCubic( progress );
 			const next = from + delta * eased;
+			valueRef.current = next;
 			setValue( next );
 			if ( progress < 1 ) {
 				rafRef.current = window.requestAnimationFrame( tick );
@@ -58,7 +61,10 @@ export function useCountUp( target, options = {} ) {
 				window.cancelAnimationFrame( rafRef.current );
 				rafRef.current = null;
 			}
-			fromRef.current = safeTarget;
+			// Hand off the actual on-screen value so a retarget mid-flight
+			// continues from where the animation visibly is, not from the
+			// previous target.
+			fromRef.current = valueRef.current;
 		};
 	}, [ safeTarget, durationMs, enabled ] );
 

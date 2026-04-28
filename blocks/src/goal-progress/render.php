@@ -48,21 +48,18 @@ $labels = array(
 
 // Aria-valuetext renders the bar's meaning to screen readers as a single
 // human sentence; the visual labels below complement (not duplicate) it.
-if ( $has_goal ) {
-	$aria_value_text = sprintf(
+// Only meaningful when a goal exists — otherwise the bar drops its
+// progressbar role entirely (see track markup below) and the raised total
+// alone carries the announcement.
+$aria_value_text = $has_goal
+	? sprintf(
 		/* translators: 1: raised amount, 2: goal amount, 3: percent. */
 		__( '%1$s raised of %2$s, %3$s%%.', 'giving-day-blocks' ),
 		GoalProgress::format_currency( $raised, $currency ),
 		GoalProgress::format_currency( $goal, $currency ),
 		(int) round( $percent )
-	);
-} else {
-	$aria_value_text = sprintf(
-		/* translators: %s: raised amount. */
-		__( '%s raised so far.', 'giving-day-blocks' ),
-		GoalProgress::format_currency( $raised, $currency )
-	);
-}
+	)
+	: '';
 
 // Seed view.js so it can hydrate without a flash, and so a failed first
 // fetch still renders the SSR numbers. Mirrors /campaign/{id}/summary.
@@ -110,21 +107,35 @@ $fill_inline_style = $orientation === 'vertical'
 			</p>
 		<?php endif; ?>
 
-		<div
-			class="giving-day-goal-progress__track"
-			role="progressbar"
-			aria-valuenow="<?php echo esc_attr( (int) round( $percent ) ); ?>"
-			aria-valuemin="0"
-			aria-valuemax="100"
-			aria-valuetext="<?php echo esc_attr( $aria_value_text ); ?>"
-		>
-			<span
-				class="giving-day-goal-progress__fill"
-				style="<?php echo esc_attr( $fill_inline_style ); ?>"
-				data-role="fill"
+		<?php if ( $has_goal ) : ?>
+			<div
+				class="giving-day-goal-progress__track"
+				role="progressbar"
+				aria-valuenow="<?php echo esc_attr( (int) round( $percent ) ); ?>"
+				aria-valuemin="0"
+				aria-valuemax="100"
+				aria-valuetext="<?php echo esc_attr( $aria_value_text ); ?>"
+			>
+				<span
+					class="giving-day-goal-progress__fill"
+					style="<?php echo esc_attr( $fill_inline_style ); ?>"
+					data-role="fill"
+					aria-hidden="true"
+				></span>
+			</div>
+		<?php else : ?>
+			<div
+				class="giving-day-goal-progress__track"
+				data-role="track-no-goal"
 				aria-hidden="true"
-			></span>
-		</div>
+			>
+				<span
+					class="giving-day-goal-progress__fill"
+					style="<?php echo esc_attr( $fill_inline_style ); ?>"
+					data-role="fill"
+				></span>
+			</div>
+		<?php endif; ?>
 
 		<div class="giving-day-goal-progress__meta">
 			<?php if ( $has_goal && $show_goal ) : ?>

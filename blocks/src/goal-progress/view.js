@@ -78,14 +78,21 @@ function GoalProgress( { root } ) {
 		orientation === 'vertical'
 			? { height: `${ percent }%` }
 			: { width: `${ percent }%` };
+	// Only build aria-valuetext when there's an actual goal to compare
+	// against — otherwise the track drops its progressbar role entirely
+	// (see below) and the raised live region alone carries the announcement.
 	const ariaValueText = hasGoal
 		? `${ formatCurrency( animatedRaised, currency ) } ${
 				labels.of
 		  } ${ formatCurrency( goal, currency ) }, ${ Math.round( percent ) }%`
-		: `${ formatCurrency( animatedRaised, currency ) }`;
+		: undefined;
 
+	// React is mounted directly into the SSR `.giving-day-goal-progress__inner`
+	// element (see `hydrate` below), so this component must NOT re-emit that
+	// wrapper — doing so would nest a duplicate `__inner` and break the
+	// vertical-grid layout that targets the single inner.
 	return (
-		<div className="giving-day-goal-progress__inner">
+		<>
 			{ showRaised && (
 				<p
 					className="giving-day-goal-progress__raised"
@@ -96,21 +103,35 @@ function GoalProgress( { root } ) {
 				</p>
 			) }
 
-			<div
-				className="giving-day-goal-progress__track"
-				role="progressbar"
-				aria-valuenow={ Math.round( percent ) }
-				aria-valuemin={ 0 }
-				aria-valuemax={ 100 }
-				aria-valuetext={ ariaValueText }
-			>
-				<span
-					className="giving-day-goal-progress__fill"
-					style={ fillStyle }
-					data-role="fill"
+			{ hasGoal ? (
+				<div
+					className="giving-day-goal-progress__track"
+					role="progressbar"
+					aria-valuenow={ Math.round( percent ) }
+					aria-valuemin={ 0 }
+					aria-valuemax={ 100 }
+					aria-valuetext={ ariaValueText }
+				>
+					<span
+						className="giving-day-goal-progress__fill"
+						style={ fillStyle }
+						data-role="fill"
+						aria-hidden="true"
+					/>
+				</div>
+			) : (
+				<div
+					className="giving-day-goal-progress__track"
+					data-role="track-no-goal"
 					aria-hidden="true"
-				/>
-			</div>
+				>
+					<span
+						className="giving-day-goal-progress__fill"
+						style={ fillStyle }
+						data-role="fill"
+					/>
+				</div>
+			) }
 
 			<div className="giving-day-goal-progress__meta">
 				{ hasGoal && showGoal && (
@@ -138,7 +159,7 @@ function GoalProgress( { root } ) {
 					</span>
 				) }
 			</div>
-		</div>
+		</>
 	);
 }
 

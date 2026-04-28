@@ -296,11 +296,7 @@ function Bar( {
 				formatCurrency( goal, currency ),
 				Math.round( percent )
 		  )
-		: sprintf(
-				/* translators: %s: raised amount. */
-				__( '%s raised so far.', 'giving-day-blocks' ),
-				formatCurrency( raised, currency )
-		  );
+		: undefined;
 
 	return (
 		<div className="giving-day-goal-progress__inner">
@@ -309,20 +305,32 @@ function Bar( {
 					{ formatCurrency( raised, currency ) }
 				</p>
 			) }
-			<div
-				className="giving-day-goal-progress__track"
-				role="progressbar"
-				aria-valuenow={ Math.round( percent ) }
-				aria-valuemin={ 0 }
-				aria-valuemax={ 100 }
-				aria-valuetext={ ariaValueText }
-			>
-				<span
-					className="giving-day-goal-progress__fill"
-					style={ fillStyle }
+			{ hasGoal ? (
+				<div
+					className="giving-day-goal-progress__track"
+					role="progressbar"
+					aria-valuenow={ Math.round( percent ) }
+					aria-valuemin={ 0 }
+					aria-valuemax={ 100 }
+					aria-valuetext={ ariaValueText }
+				>
+					<span
+						className="giving-day-goal-progress__fill"
+						style={ fillStyle }
+						aria-hidden="true"
+					/>
+				</div>
+			) : (
+				<div
+					className="giving-day-goal-progress__track"
 					aria-hidden="true"
-				/>
-			</div>
+				>
+					<span
+						className="giving-day-goal-progress__fill"
+						style={ fillStyle }
+					/>
+				</div>
+			) }
 			<div className="giving-day-goal-progress__meta">
 				{ hasGoal && showGoal && (
 					<span className="giving-day-goal-progress__goal">
