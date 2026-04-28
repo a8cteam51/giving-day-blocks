@@ -114,18 +114,9 @@
 		}
 	}
 
-	// Animated transitions on the bar fill. Disabled for users who prefer
-	// reduced motion — the count-up hook handles the matching JS opt-out.
-	&.is-animated {
-		.giving-day-goal-progress__fill {
-			transition: width 700ms cubic-bezier(0.22, 1, 0.36, 1),
-				height 700ms cubic-bezier(0.22, 1, 0.36, 1);
-		}
-
-		@include reduced-motion {
-			.giving-day-goal-progress__fill {
-				transition: none;
-			}
-		}
-	}
+	// The `is-animated` class is left as a hook for theme overrides. The
+	// bar's fill is animated client-side by `useCountUp` in view.js (rAF +
+	// ease-out), which already honors `prefers-reduced-motion`. Adding a
+	// CSS `transition: width` here would fight with the per-frame rAF
+	// updates and visibly drag the fill, so we deliberately don't.
 }

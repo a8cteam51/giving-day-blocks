@@ -4,13 +4,14 @@
  * Reads `data-*` attributes from render.php, polls /campaign/{id}/summary
  * (faster while live, slower otherwise), and replaces the SSR inner
  * markup with a live, animated React tree that:
- *   - eases the bar fill (CSS transition)
- *   - counts the raised amount up to the new value (rAF, useCountUp)
+ *   - eases the bar fill via the rAF count-up loop (gated by `animateBar`)
+ *   - counts the raised amount + percent up to the new value
+ *     (gated by `animateNumbers`)
  *   - reflects the changing percent in `aria-valuenow` / `aria-valuetext`.
  *
- * Animation is disabled automatically when the user has
- * `prefers-reduced-motion: reduce`, when the `animate` attribute is off,
- * or when the editor / theme has set `--giving-day-disable-anim: 1`.
+ * Both gates are AND-ed with `prefers-reduced-motion: reduce` inside
+ * useCountUp, so a visitor opting out of motion always sees an instant
+ * snap regardless of editor settings.
  */
 import { createRoot } from '@wordpress/element';
 
@@ -36,7 +37,8 @@ function GoalProgress( { root } ) {
 	const campaignId = Number( root.dataset.campaignId );
 	const orientation =
 		root.dataset.orientation === 'vertical' ? 'vertical' : 'horizontal';
-	const animate = root.dataset.animate === '1';
+	const animateBar = root.dataset.animateBar === '1';
+	const animateNumbers = root.dataset.animateNumbers === '1';
 	const showPercent = root.dataset.showPercent === '1';
 	const showRaised = root.dataset.showRaised === '1';
 	const showGoal = root.dataset.showGoal === '1';
@@ -64,20 +66,35 @@ function GoalProgress( { root } ) {
 		data?.percent ?? initialData?.percent ?? computePercent( raised, goal );
 	const percent = clampPercent( percentSource );
 
+	// `initialValue: 0` runs a one-shot mount animation (bar fills from 0%,
+	// numbers count up from 0) so visitors get the visual feedback even when
+	// no donations have polled in yet. Each rAF loop is gated independently:
+	// the bar uses its own loop driven by `animateBar`, the displayed numbers
+	// use a parallel loop driven by `animateNumbers`. Both are short-circuited
+	// to "snap to target" by useCountUp under `prefers-reduced-motion`.
 	const animatedRaised = useCountUp( raised, {
-		enabled: animate,
+		enabled: animateNumbers,
 		durationMs: 700,
+		initialValue: 0,
 	} );
-	const animatedPercent = useCountUp( percent, {
-		enabled: animate,
+	const animatedPercentForNumbers = useCountUp( percent, {
+		enabled: animateNumbers,
 		durationMs: 700,
+		initialValue: 0,
+	} );
+	const animatedPercentForBar = useCountUp( percent, {
+		enabled: animateBar,
+		durationMs: 700,
+		initialValue: 0,
 	} );
 
 	const hasGoal = goal > 0;
+	// Bar fill rides its own rAF loop so toggling "Animate numbers" off
+	// (with bar animation on) still gives a smooth fill, and vice versa.
 	const fillStyle =
 		orientation === 'vertical'
-			? { height: `${ percent }%` }
-			: { width: `${ percent }%` };
+			? { height: `${ animatedPercentForBar }%` }
+			: { width: `${ animatedPercentForBar }%` };
 	// Only build aria-valuetext when there's an actual goal to compare
 	// against — otherwise the track drops its progressbar role entirely
 	// (see below) and the raised live region alone carries the announcement.
@@ -147,7 +164,7 @@ function GoalProgress( { root } ) {
 						className="giving-day-goal-progress__percent"
 						data-role="percent"
 					>
-						{ Math.round( animatedPercent ) }%
+						{ Math.round( animatedPercentForNumbers ) }%
 					</span>
 				) }
 				{ showDonors && donors > 0 && (

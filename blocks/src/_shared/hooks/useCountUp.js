@@ -7,23 +7,38 @@
  * `formatCurrency` / `formatNumber`. The hook intentionally returns a
  * raw number (not a string) so the caller controls formatting.
  *
- * @param {number}  target               The value to animate to.
- * @param {Object}  [options]            Behavior overrides.
- * @param {number}  [options.durationMs] Animation duration in ms (default 700).
- * @param {boolean} [options.enabled]    When false, snaps to target (default true).
+ * @param {number}  target                 The value to animate to.
+ * @param {Object}  [options]              Behavior overrides.
+ * @param {number}  [options.durationMs]   Animation duration in ms (default 700).
+ * @param {boolean} [options.enabled]      When false, snaps to target (default true).
+ * @param {number}  [options.initialValue] Optional starting value for a one-shot
+ *                                         mount animation (e.g., 0 to count up
+ *                                         from zero on first render). Ignored
+ *                                         when motion is disabled.
  * @return {number} The current animated value.
  */
 import { useEffect, useRef, useState } from '@wordpress/element';
 
 export function useCountUp( target, options = {} ) {
-	const { durationMs = 700, enabled = true } = options;
+	const { durationMs = 700, enabled = true, initialValue } = options;
 	const safeTarget = Number.isFinite( Number( target ) )
 		? Number( target )
 		: 0;
 
-	const [ value, setValue ] = useState( safeTarget );
-	const fromRef = useRef( safeTarget );
-	const valueRef = useRef( safeTarget );
+	// `initialValue` only seeds the *first* render and only when motion is
+	// allowed. It lets callers opt into an initial animation from
+	// `initialValue` → target (e.g., a goal bar that fills from 0% on page
+	// load) without affecting the response to later target changes.
+	const seed =
+		Number.isFinite( Number( initialValue ) ) &&
+		enabled &&
+		! prefersReducedMotion()
+			? Number( initialValue )
+			: safeTarget;
+
+	const [ value, setValue ] = useState( seed );
+	const fromRef = useRef( seed );
+	const valueRef = useRef( seed );
 	const rafRef = useRef( null );
 
 	useEffect( () => {

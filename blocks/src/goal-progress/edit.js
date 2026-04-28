@@ -33,7 +33,8 @@ export default function Edit( { attributes, setAttributes } ) {
 		showRaised,
 		showGoal,
 		showDonorCount,
-		animate,
+		animateBar,
+		animateNumbers,
 	} = attributes;
 
 	const { campaigns, campaign, isResolving } = useSelect(
@@ -253,14 +254,25 @@ export default function Edit( { attributes, setAttributes } ) {
 						}
 					/>
 					<ToggleControl
-						label={ __( 'Animate', 'giving-day-blocks' ) }
+						label={ __( 'Animate bar', 'giving-day-blocks' ) }
 						help={ __(
-							'Eases the bar and counts the raised amount up. Disabled automatically when the visitor prefers reduced motion.',
+							'Eases the bar fill on first paint and on live updates. Disabled automatically when the visitor prefers reduced motion.',
 							'giving-day-blocks'
 						) }
-						checked={ !! animate }
+						checked={ !! animateBar }
 						onChange={ ( value ) =>
-							setAttributes( { animate: value } )
+							setAttributes( { animateBar: value } )
+						}
+					/>
+					<ToggleControl
+						label={ __( 'Animate numbers', 'giving-day-blocks' ) }
+						help={ __(
+							'Counts the raised amount and percent up to the new value. Disabled automatically when the visitor prefers reduced motion.',
+							'giving-day-blocks'
+						) }
+						checked={ !! animateNumbers }
+						onChange={ ( value ) =>
+							setAttributes( { animateNumbers: value } )
 						}
 					/>
 				</PanelBody>

@@ -22,10 +22,14 @@ import { createRoot } from 'react-dom/client';
 
 import { useCountUp } from '../../blocks/src/_shared/hooks/useCountUp';
 
-function mountProbe( { target, enabled = true } ) {
+function mountProbe( { target, enabled = true, initialValue } = {} ) {
 	const seen = [];
 	const Probe = ( { value, on } ) => {
-		const out = useCountUp( value, { enabled: on, durationMs: 50 } );
+		const out = useCountUp( value, {
+			enabled: on,
+			durationMs: 50,
+			initialValue,
+		} );
 		seen.push( out );
 		return null;
 	};
@@ -99,6 +103,58 @@ describe( 'useCountUp', () => {
 			enabled: false,
 		} );
 		expect( seen[ seen.length - 1 ] ).toBe( 0 );
+		unmount();
+	} );
+
+	test( 'ignores initialValue when disabled and snaps to target', () => {
+		const { seen, unmount } = mountProbe( {
+			target: 1234,
+			enabled: false,
+			initialValue: 0,
+		} );
+		// With motion disabled the hook must not seed from initialValue —
+		// the consumer expects the final value on the very first paint.
+		expect( seen[ 0 ] ).toBe( 1234 );
+		expect( seen[ seen.length - 1 ] ).toBe( 1234 );
+		unmount();
+	} );
+
+	test( 'ignores initialValue under prefers-reduced-motion', () => {
+		const original = window.matchMedia;
+		window.matchMedia = ( query ) => ( {
+			matches: query.includes( 'reduce' ),
+			media: query,
+			onchange: null,
+			addEventListener: () => {},
+			removeEventListener: () => {},
+			dispatchEvent: () => false,
+			addListener: () => {},
+			removeListener: () => {},
+		} );
+
+		try {
+			const { seen, unmount } = mountProbe( {
+				target: 500,
+				enabled: true,
+				initialValue: 0,
+			} );
+			expect( seen[ 0 ] ).toBe( 500 );
+			expect( seen[ seen.length - 1 ] ).toBe( 500 );
+			unmount();
+		} finally {
+			window.matchMedia = original;
+		}
+	} );
+
+	test( 'seeds first render from initialValue when motion is allowed', () => {
+		const { seen, unmount } = mountProbe( {
+			target: 100,
+			enabled: true,
+			initialValue: 0,
+		} );
+		// First render must reflect the seed so the bar/numbers start at
+		// zero before the rAF loop animates toward the real target.
+		expect( seen[ 0 ] ).toBe( 0 );
 		unmount();
 	} );
 } );

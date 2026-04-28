@@ -32,7 +32,8 @@ $show_percent    = ! empty( $attributes['showPercent'] );
 $show_raised     = ! empty( $attributes['showRaised'] );
 $show_goal       = ! empty( $attributes['showGoal'] );
 $show_donors     = ! empty( $attributes['showDonorCount'] );
-$animate         = ! empty( $attributes['animate'] );
+$animate_bar     = ! empty( $attributes['animateBar'] );
+$animate_numbers = ! empty( $attributes['animateNumbers'] );
 
 $goal      = (float) $progress['goal'];
 $raised    = (float) $progress['raised'];
@@ -71,15 +72,23 @@ $initial = array(
 	'percent'     => $percent,
 );
 
+// `is-bar-animated` / `is-numbers-animated` are exposed as theme hooks; the
+// actual animation runs client-side in view.js (rAF + ease-out via
+// useCountUp) and already honors `prefers-reduced-motion`, so themes don't
+// need to layer CSS transitions on top.
 $wrapper_extra = array(
-	'class'                 => sprintf(
-		'giving-day-goal-progress giving-day-goal-progress--%s%s',
-		esc_attr( $orientation ),
-		$animate ? ' is-animated' : ''
+	'class'                 => trim(
+		sprintf(
+			'giving-day-goal-progress giving-day-goal-progress--%s%s%s',
+			esc_attr( $orientation ),
+			$animate_bar ? ' is-bar-animated' : '',
+			$animate_numbers ? ' is-numbers-animated' : ''
+		)
 	),
 	'data-campaign-id'      => (string) $campaign_id,
 	'data-orientation'      => $orientation,
-	'data-animate'          => $animate ? '1' : '0',
+	'data-animate-bar'      => $animate_bar ? '1' : '0',
+	'data-animate-numbers'  => $animate_numbers ? '1' : '0',
 	'data-show-percent'     => $show_percent ? '1' : '0',
 	'data-show-raised'      => $show_raised ? '1' : '0',
 	'data-show-goal'        => $show_goal ? '1' : '0',

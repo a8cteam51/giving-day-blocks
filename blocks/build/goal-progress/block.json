@@ -61,7 +61,11 @@
       "type": "boolean",
       "default": false
     },
-    "animate": {
+    "animateBar": {
+      "type": "boolean",
+      "default": true
+    },
+    "animateNumbers": {
       "type": "boolean",
       "default": true
     }
