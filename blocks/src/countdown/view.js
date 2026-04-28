@@ -7,7 +7,10 @@
  */
 import { createRoot, useRef } from '@wordpress/element';
 
-import { useCampaignStatus, splitDuration } from '../_shared/hooks/useCampaignStatus';
+import {
+	useCampaignStatus,
+	splitDuration,
+} from '../_shared/hooks/useCampaignStatus';
 import { useCampaignSummary } from '../_shared/hooks/useCampaignSummary';
 import { formatCurrency, formatNumber } from '../_shared/utils/formatCurrency';
 import { readPreviewOverride } from '../_shared/hooks/usePreviewOverride';
@@ -26,21 +29,37 @@ function Countdown( { remainingMs, labels, hideDays = false } ) {
 		<div className="giving-day-countdown__countdown" aria-live="polite">
 			{ ! hideDays && (
 				<div className="giving-day-countdown__unit">
-					<span className="giving-day-countdown__value">{ days }</span>
-					<span className="giving-day-countdown__label">{ labels.days }</span>
+					<span className="giving-day-countdown__value">
+						{ days }
+					</span>
+					<span className="giving-day-countdown__label">
+						{ labels.days }
+					</span>
 				</div>
 			) }
 			<div className="giving-day-countdown__unit">
-				<span className="giving-day-countdown__value">{ pad( hours ) }</span>
-				<span className="giving-day-countdown__label">{ labels.hours }</span>
+				<span className="giving-day-countdown__value">
+					{ pad( hours ) }
+				</span>
+				<span className="giving-day-countdown__label">
+					{ labels.hours }
+				</span>
 			</div>
 			<div className="giving-day-countdown__unit">
-				<span className="giving-day-countdown__value">{ pad( minutes ) }</span>
-				<span className="giving-day-countdown__label">{ labels.minutes }</span>
+				<span className="giving-day-countdown__value">
+					{ pad( minutes ) }
+				</span>
+				<span className="giving-day-countdown__label">
+					{ labels.minutes }
+				</span>
 			</div>
 			<div className="giving-day-countdown__unit">
-				<span className="giving-day-countdown__value">{ pad( seconds ) }</span>
-				<span className="giving-day-countdown__label">{ labels.seconds }</span>
+				<span className="giving-day-countdown__value">
+					{ pad( seconds ) }
+				</span>
+				<span className="giving-day-countdown__label">
+					{ labels.seconds }
+				</span>
 			</div>
 		</div>
 	);
@@ -100,7 +119,9 @@ function App( { root } ) {
 	if ( status === 'scheduled' ) {
 		return (
 			<>
-				<p className="giving-day-countdown__headline">{ preHeadline }</p>
+				<p className="giving-day-countdown__headline">
+					{ preHeadline }
+				</p>
 				<Countdown remainingMs={ msRemaining } labels={ labels } />
 			</>
 		);
@@ -109,7 +130,9 @@ function App( { root } ) {
 	if ( status === 'live' ) {
 		return (
 			<>
-				<p className="giving-day-countdown__headline">{ liveHeadline }</p>
+				<p className="giving-day-countdown__headline">
+					{ liveHeadline }
+				</p>
 				<Countdown
 					remainingMs={ liveRemaining }
 					labels={ labels }
@@ -126,7 +149,8 @@ function App( { root } ) {
 				{ formatCurrency( raised, currency ) }
 			</p>
 			<p className="giving-day-countdown__final-meta">
-				{ labels.raisedTowardGoalOf } { formatCurrency( goal, currency ) }
+				{ labels.raisedTowardGoalOf }{ ' ' }
+				{ formatCurrency( goal, currency ) }
 			</p>
 			{ showDonorCount && donors > 0 && (
 				<p className="giving-day-countdown__donors">
@@ -151,7 +175,9 @@ function hydrate( root ) {
 }
 
 function boot() {
-	const nodes = document.querySelectorAll( '.giving-day-countdown[data-campaign-id]' );
+	const nodes = document.querySelectorAll(
+		'.giving-day-countdown[data-campaign-id]'
+	);
 	nodes.forEach( hydrate );
 
 	// If a logged-in user loaded the page with ?givingday=, re-render on

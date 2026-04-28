@@ -45,9 +45,9 @@ describe( 'withPreviewParam', () => {
 
 	it( 'is a passthrough without a logged-in session', () => {
 		setUrl( '?givingday=pre' );
-		expect( withPreviewParam( '/giving-day/v1/campaign/1/countdown' ) ).toBe(
-			'/giving-day/v1/campaign/1/countdown'
-		);
+		expect(
+			withPreviewParam( '/giving-day/v1/campaign/1/countdown' )
+		).toBe( '/giving-day/v1/campaign/1/countdown' );
 	} );
 
 	it( 'appends a short code for logged-in users', () => {
@@ -61,6 +61,8 @@ describe( 'withPreviewParam', () => {
 	it( 'respects an existing query string', () => {
 		document.body.classList.add( 'logged-in' );
 		setUrl( '?givingday=live' );
-		expect( withPreviewParam( '/x?foo=1' ) ).toBe( '/x?foo=1&givingday=live' );
+		expect( withPreviewParam( '/x?foo=1' ) ).toBe(
+			'/x?foo=1&givingday=live'
+		);
 	} );
 } );

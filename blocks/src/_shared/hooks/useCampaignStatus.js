@@ -10,10 +10,10 @@ export { splitDuration };
  * + millisecond countdown value in sync. Pauses when the tab is hidden.
  *
  * @param {number} campaignId
- * @param {object} [options]
+ * @param {Object} [options]
  * @param {number} [options.refreshMs=30000] How often to re-fetch server_time.
- * @param {object} [options.initialData] SSR-provided payload to avoid a first flash.
- * @returns {{
+ * @param {Object} [options.initialData]     SSR-provided payload to avoid a first flash.
+ * @return {{
  *   status: "scheduled"|"live"|"ended"|"idle"|"loading",
  *   data: object|null,
  *   error: Error|null,
@@ -56,7 +56,9 @@ export function useCampaignStatus( campaignId, options = {} ) {
 				setError( null );
 			} catch ( err ) {
 				if ( ! cancelled ) {
-					setError( err instanceof Error ? err : new Error( String( err ) ) );
+					setError(
+						err instanceof Error ? err : new Error( String( err ) )
+					);
 				}
 			}
 		};
@@ -102,7 +104,9 @@ export function useCampaignStatus( campaignId, options = {} ) {
 		const s = data.status || 'idle';
 		const startMs = data.start ? Date.parse( data.start ) : NaN;
 		const endMs = data.end ? Date.parse( data.end ) : NaN;
-		const preMs = data.pre_event_start ? Date.parse( data.pre_event_start ) : NaN;
+		const preMs = data.pre_event_start
+			? Date.parse( data.pre_event_start )
+			: NaN;
 
 		let target = null;
 		if ( s === 'scheduled' ) {

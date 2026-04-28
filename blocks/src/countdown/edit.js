@@ -33,27 +33,37 @@ function CountdownDigits( { label, remaining, hideDays = false } ) {
 		<div className="giving-day-countdown__countdown" aria-label={ label }>
 			{ ! hideDays && (
 				<div className="giving-day-countdown__unit">
-					<span className="giving-day-countdown__value">{ days }</span>
-					<span className="giving-day-countdown__label">{ __( 'days', 'giving-day-blocks' ) }</span>
+					<span className="giving-day-countdown__value">
+						{ days }
+					</span>
+					<span className="giving-day-countdown__label">
+						{ __( 'days', 'giving-day-blocks' ) }
+					</span>
 				</div>
 			) }
 			<div className="giving-day-countdown__unit">
 				<span className="giving-day-countdown__value">
 					{ String( hours ).padStart( 2, '0' ) }
 				</span>
-				<span className="giving-day-countdown__label">{ __( 'hours', 'giving-day-blocks' ) }</span>
+				<span className="giving-day-countdown__label">
+					{ __( 'hours', 'giving-day-blocks' ) }
+				</span>
 			</div>
 			<div className="giving-day-countdown__unit">
 				<span className="giving-day-countdown__value">
 					{ String( minutes ).padStart( 2, '0' ) }
 				</span>
-				<span className="giving-day-countdown__label">{ __( 'minutes', 'giving-day-blocks' ) }</span>
+				<span className="giving-day-countdown__label">
+					{ __( 'minutes', 'giving-day-blocks' ) }
+				</span>
 			</div>
 			<div className="giving-day-countdown__unit">
 				<span className="giving-day-countdown__value">
 					{ String( seconds ).padStart( 2, '0' ) }
 				</span>
-				<span className="giving-day-countdown__label">{ __( 'seconds', 'giving-day-blocks' ) }</span>
+				<span className="giving-day-countdown__label">
+					{ __( 'seconds', 'giving-day-blocks' ) }
+				</span>
 			</div>
 		</div>
 	);
@@ -98,7 +108,9 @@ function StateBody( { state, attributes, campaign } ) {
 		const remaining = Math.max( 0, Math.floor( ( target - now ) / 1000 ) );
 		return (
 			<>
-				<p className="giving-day-countdown__headline">{ attributes.preHeadline }</p>
+				<p className="giving-day-countdown__headline">
+					{ attributes.preHeadline }
+				</p>
 				<CountdownDigits
 					remaining={ remaining }
 					label={ attributes.preHeadline }
@@ -113,7 +125,9 @@ function StateBody( { state, attributes, campaign } ) {
 		);
 		return (
 			<>
-				<p className="giving-day-countdown__headline">{ attributes.liveHeadline }</p>
+				<p className="giving-day-countdown__headline">
+					{ attributes.liveHeadline }
+				</p>
 				<CountdownDigits
 					remaining={ remaining }
 					label={ attributes.liveHeadline }
@@ -125,7 +139,9 @@ function StateBody( { state, attributes, campaign } ) {
 
 	return (
 		<>
-			<p className="giving-day-countdown__headline">{ attributes.endedHeadline }</p>
+			<p className="giving-day-countdown__headline">
+				{ attributes.endedHeadline }
+			</p>
 			<p className="giving-day-countdown__final">
 				{ formatCurrency( raised, currency ) }
 			</p>
@@ -135,7 +151,8 @@ function StateBody( { state, attributes, campaign } ) {
 			</p>
 			{ attributes.showDonorCount && donors > 0 && (
 				<p className="giving-day-countdown__donors">
-					{ formatNumber( donors ) } { __( 'donors', 'giving-day-blocks' ) }
+					{ formatNumber( donors ) }{ ' ' }
+					{ __( 'donors', 'giving-day-blocks' ) }
 				</p>
 			) }
 		</>
@@ -156,7 +173,11 @@ export default function Edit( { attributes, setAttributes } ) {
 						order: 'desc',
 					} ) || [],
 				campaign: campaignId
-					? core.getEntityRecord( 'postType', 'giving_campaign', campaignId )
+					? core.getEntityRecord(
+							'postType',
+							'giving_campaign',
+							campaignId
+					  )
 					: null,
 				isResolving: campaignId
 					? core.isResolving( 'getEntityRecord', [
@@ -172,7 +193,10 @@ export default function Edit( { attributes, setAttributes } ) {
 
 	const campaignOptions = useMemo( () => {
 		const opts = [
-			{ label: __( '— Select a campaign —', 'giving-day-blocks' ), value: 0 },
+			{
+				label: __( '— Select a campaign —', 'giving-day-blocks' ),
+				value: 0,
+			},
 		];
 		( campaigns || [] ).forEach( ( c ) => {
 			opts.push( {
@@ -197,7 +221,10 @@ export default function Edit( { attributes, setAttributes } ) {
 		}
 		const meta = campaign?.meta;
 		const override = meta?._giving_status_override;
-		if ( override && [ 'scheduled', 'live', 'ended' ].includes( override ) ) {
+		if (
+			override &&
+			[ 'scheduled', 'live', 'ended' ].includes( override )
+		) {
 			return override;
 		}
 		return 'scheduled';
@@ -223,13 +250,18 @@ export default function Edit( { attributes, setAttributes } ) {
 						value={ campaignId || 0 }
 						options={ campaignOptions }
 						onChange={ ( value ) =>
-							setAttributes( { campaignId: parseInt( value, 10 ) || undefined } )
+							setAttributes( {
+								campaignId: parseInt( value, 10 ) || undefined,
+							} )
 						}
 						__next40pxDefaultSize
 						__nextHasNoMarginBottom
 					/>
 					<ToggleGroupControl
-						label={ __( 'Editor preview state', 'giving-day-blocks' ) }
+						label={ __(
+							'Editor preview state',
+							'giving-day-blocks'
+						) }
 						value={ resolvedState }
 						onChange={ ( value ) =>
 							setAttributes( { previewState: value || '' } )
@@ -256,49 +288,77 @@ export default function Edit( { attributes, setAttributes } ) {
 						/>
 					</ToggleGroupControl>
 				</PanelBody>
-				<PanelBody title={ __( 'Headlines', 'giving-day-blocks' ) } initialOpen={ false }>
+				<PanelBody
+					title={ __( 'Headlines', 'giving-day-blocks' ) }
+					initialOpen={ false }
+				>
 					<TextControl
-						label={ __( 'Pre-event headline', 'giving-day-blocks' ) }
-                        placeholder={ __( 'Giving Day starts in', 'giving-day-blocks' ) }
+						label={ __(
+							'Pre-event headline',
+							'giving-day-blocks'
+						) }
+						placeholder={ __(
+							'Giving Day starts in',
+							'giving-day-blocks'
+						) }
 						value={ attributes.preHeadline }
-						onChange={ ( value ) => setAttributes( { preHeadline: value } ) }
+						onChange={ ( value ) =>
+							setAttributes( { preHeadline: value } )
+						}
 						{ ...focusHandlers( 'scheduled' ) }
 						__next40pxDefaultSize
 						__nextHasNoMarginBottom
 					/>
 					<TextControl
 						label={ __( 'Live headline', 'giving-day-blocks' ) }
-                        placeholder={ __( 'Giving now', 'giving-day-blocks' ) }
+						placeholder={ __( 'Giving now', 'giving-day-blocks' ) }
 						value={ attributes.liveHeadline }
-						onChange={ ( value ) => setAttributes( { liveHeadline: value } ) }
+						onChange={ ( value ) =>
+							setAttributes( { liveHeadline: value } )
+						}
 						{ ...focusHandlers( 'live' ) }
 						__next40pxDefaultSize
 						__nextHasNoMarginBottom
 					/>
 					<TextControl
 						label={ __( 'Ended headline', 'giving-day-blocks' ) }
-                        placeholder={ __( 'Thank you!', 'giving-day-blocks' ) }
+						placeholder={ __( 'Thank you!', 'giving-day-blocks' ) }
 						value={ attributes.endedHeadline }
-						onChange={ ( value ) => setAttributes( { endedHeadline: value } ) }
+						onChange={ ( value ) =>
+							setAttributes( { endedHeadline: value } )
+						}
 						{ ...focusHandlers( 'ended' ) }
 						__next40pxDefaultSize
 						__nextHasNoMarginBottom
 					/>
 				</PanelBody>
-				<PanelBody title={ __( 'Display', 'giving-day-blocks' ) } initialOpen={ false }>
+				<PanelBody
+					title={ __( 'Display', 'giving-day-blocks' ) }
+					initialOpen={ false }
+				>
 					<ToggleControl
-						label={ __( 'Show donor count on ended state', 'giving-day-blocks' ) }
+						label={ __(
+							'Show donor count on ended state',
+							'giving-day-blocks'
+						) }
 						checked={ !! attributes.showDonorCount }
-						onChange={ ( value ) => setAttributes( { showDonorCount: value } ) }
+						onChange={ ( value ) =>
+							setAttributes( { showDonorCount: value } )
+						}
 					/>
 					<ToggleControl
-						label={ __( 'Hide post-event state', 'giving-day-blocks' ) }
+						label={ __(
+							'Hide post-event state',
+							'giving-day-blocks'
+						) }
 						help={ __(
 							'Use this when pairing with a standalone Totals block placed elsewhere.',
 							'giving-day-blocks'
 						) }
 						checked={ !! hidePostEvent }
-						onChange={ ( value ) => setAttributes( { hidePostEvent: value } ) }
+						onChange={ ( value ) =>
+							setAttributes( { hidePostEvent: value } )
+						}
 					/>
 				</PanelBody>
 			</InspectorControls>
@@ -307,7 +367,10 @@ export default function Edit( { attributes, setAttributes } ) {
 				{ ! campaignId ? (
 					<Placeholder
 						icon="clock"
-						label={ __( 'Giving Day: Countdown', 'giving-day-blocks' ) }
+						label={ __(
+							'Giving Day: Countdown',
+							'giving-day-blocks'
+						) }
 						instructions={ __(
 							'Pick a campaign in the block sidebar to preview the countdown and totals.',
 							'giving-day-blocks'
@@ -319,7 +382,8 @@ export default function Edit( { attributes, setAttributes } ) {
 							options={ campaignOptions }
 							onChange={ ( value ) =>
 								setAttributes( {
-									campaignId: parseInt( value, 10 ) || undefined,
+									campaignId:
+										parseInt( value, 10 ) || undefined,
 								} )
 							}
 							__next40pxDefaultSize

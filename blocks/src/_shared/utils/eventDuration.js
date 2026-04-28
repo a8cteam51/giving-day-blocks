@@ -32,4 +32,4 @@ export function shouldHideDays( startIso, endIso ) {
  * 23:59:59 in milliseconds — chosen so short-duration events render
  * the exact moment the days unit would drop off.
  */
-export const PREVIEW_REMAINING_MS = ( ( 24 * 60 * 60 ) - 1 ) * 1000;
+export const PREVIEW_REMAINING_MS = ( 24 * 60 * 60 - 1 ) * 1000;

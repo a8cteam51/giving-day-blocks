@@ -16,12 +16,25 @@ import { campaignColorStyle } from '../_shared/utils/campaignColorStyle';
 import './editor.scss';
 
 const MODE_CHOICES = [
-	{ label: __( 'Auto (running while live, final once ended)', 'giving-day-blocks' ), value: 'auto' },
-	{ label: __( 'Final only (hidden until the event ends)', 'giving-day-blocks' ), value: 'final-only' },
+	{
+		label: __(
+			'Auto (running while live, final once ended)',
+			'giving-day-blocks'
+		),
+		value: 'auto',
+	},
+	{
+		label: __(
+			'Final only (hidden until the event ends)',
+			'giving-day-blocks'
+		),
+		value: 'final-only',
+	},
 ];
 
 export default function Edit( { attributes, setAttributes } ) {
-	const { campaignId, mode, headline, subhead, showDonorCount, showGoal } = attributes;
+	const { campaignId, mode, headline, subhead, showDonorCount, showGoal } =
+		attributes;
 
 	const { campaigns, campaign } = useSelect(
 		( select ) => {
@@ -34,7 +47,11 @@ export default function Edit( { attributes, setAttributes } ) {
 						order: 'desc',
 					} ) || [],
 				campaign: campaignId
-					? core.getEntityRecord( 'postType', 'giving_campaign', campaignId )
+					? core.getEntityRecord(
+							'postType',
+							'giving_campaign',
+							campaignId
+					  )
 					: null,
 			};
 		},
@@ -43,7 +60,10 @@ export default function Edit( { attributes, setAttributes } ) {
 
 	const options = useMemo( () => {
 		const opts = [
-			{ label: __( '— Select a campaign —', 'giving-day-blocks' ), value: 0 },
+			{
+				label: __( '— Select a campaign —', 'giving-day-blocks' ),
+				value: 0,
+			},
 		];
 		( campaigns || [] ).forEach( ( c ) => {
 			opts.push( {
@@ -74,7 +94,9 @@ export default function Edit( { attributes, setAttributes } ) {
 						value={ campaignId || 0 }
 						options={ options }
 						onChange={ ( value ) =>
-							setAttributes( { campaignId: parseInt( value, 10 ) || undefined } )
+							setAttributes( {
+								campaignId: parseInt( value, 10 ) || undefined,
+							} )
 						}
 						__next40pxDefaultSize
 						__nextHasNoMarginBottom
@@ -83,37 +105,53 @@ export default function Edit( { attributes, setAttributes } ) {
 						label={ __( 'Mode', 'giving-day-blocks' ) }
 						value={ mode || 'auto' }
 						options={ MODE_CHOICES }
-						onChange={ ( value ) => setAttributes( { mode: value } ) }
+						onChange={ ( value ) =>
+							setAttributes( { mode: value } )
+						}
 						__next40pxDefaultSize
 						__nextHasNoMarginBottom
 					/>
 				</PanelBody>
-				<PanelBody title={ __( 'Copy', 'giving-day-blocks' ) } initialOpen={ false }>
+				<PanelBody
+					title={ __( 'Copy', 'giving-day-blocks' ) }
+					initialOpen={ false }
+				>
 					<TextControl
 						label={ __( 'Headline', 'giving-day-blocks' ) }
 						value={ headline }
-						onChange={ ( value ) => setAttributes( { headline: value } ) }
+						onChange={ ( value ) =>
+							setAttributes( { headline: value } )
+						}
 						__next40pxDefaultSize
 						__nextHasNoMarginBottom
 					/>
 					<TextControl
 						label={ __( 'Subhead', 'giving-day-blocks' ) }
 						value={ subhead }
-						onChange={ ( value ) => setAttributes( { subhead: value } ) }
+						onChange={ ( value ) =>
+							setAttributes( { subhead: value } )
+						}
 						__next40pxDefaultSize
 						__nextHasNoMarginBottom
 					/>
 				</PanelBody>
-				<PanelBody title={ __( 'Display', 'giving-day-blocks' ) } initialOpen={ false }>
+				<PanelBody
+					title={ __( 'Display', 'giving-day-blocks' ) }
+					initialOpen={ false }
+				>
 					<ToggleControl
 						label={ __( 'Show goal', 'giving-day-blocks' ) }
 						checked={ !! showGoal }
-						onChange={ ( value ) => setAttributes( { showGoal: value } ) }
+						onChange={ ( value ) =>
+							setAttributes( { showGoal: value } )
+						}
 					/>
 					<ToggleControl
 						label={ __( 'Show donor count', 'giving-day-blocks' ) }
 						checked={ !! showDonorCount }
-						onChange={ ( value ) => setAttributes( { showDonorCount: value } ) }
+						onChange={ ( value ) =>
+							setAttributes( { showDonorCount: value } )
+						}
 					/>
 				</PanelBody>
 			</InspectorControls>
@@ -133,7 +171,10 @@ export default function Edit( { attributes, setAttributes } ) {
 							value={ 0 }
 							options={ options }
 							onChange={ ( value ) =>
-								setAttributes( { campaignId: parseInt( value, 10 ) || undefined } )
+								setAttributes( {
+									campaignId:
+										parseInt( value, 10 ) || undefined,
+								} )
 							}
 							__next40pxDefaultSize
 							__nextHasNoMarginBottom
@@ -142,7 +183,9 @@ export default function Edit( { attributes, setAttributes } ) {
 				) : (
 					<>
 						{ headline && (
-							<p className="giving-day-totals__headline">{ headline }</p>
+							<p className="giving-day-totals__headline">
+								{ headline }
+							</p>
 						) }
 						<p className="giving-day-totals__amount">
 							{ formatCurrency( raised, currency ) }
@@ -159,7 +202,11 @@ export default function Edit( { attributes, setAttributes } ) {
 								{ __( 'donors', 'giving-day-blocks' ) }
 							</p>
 						) }
-						{ subhead && <p className="giving-day-totals__subhead">{ subhead }</p> }
+						{ subhead && (
+							<p className="giving-day-totals__subhead">
+								{ subhead }
+							</p>
+						) }
 						{ mode === 'final-only' && (
 							<p className="giving-day-totals__mode-hint">
 								{ __(
