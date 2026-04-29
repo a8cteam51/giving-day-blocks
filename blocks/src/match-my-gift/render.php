@@ -116,7 +116,7 @@ $wrapper_attrs = get_block_wrapper_attributes( $wrapper_extra );
 					<?php echo esc_html( $progress['title'] ); ?>
 				</h3>
 			<?php endif; ?>
-			<?php if ( '' !== $sponsor_name && ( $show_name || $show_logo ) ) : ?>
+			<?php if ( ( '' !== $sponsor_name || '' !== $sponsor_logo ) && ( $show_name || $show_logo ) ) : ?>
 				<p class="giving-day-match__sponsor" data-role="sponsor">
 					<?php if ( $show_logo && '' !== $sponsor_logo ) : ?>
 						<img

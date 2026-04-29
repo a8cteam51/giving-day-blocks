@@ -25,7 +25,7 @@ export const MATCH_STATE_COMPLETED = 'completed';
  */
 export function matchProgressPath( matchId ) {
 	const id = Number( matchId );
-	if ( ! Number.isFinite( id ) || id <= 0 ) {
+	if ( ! Number.isInteger( id ) || id <= 0 ) {
 		return null;
 	}
 	return `/giving-day/v1/match/${ id }/progress`;
@@ -39,7 +39,7 @@ export function matchProgressPath( matchId ) {
  */
 export function activeMatchesPath( campaignId ) {
 	const id = Number( campaignId );
-	if ( ! Number.isFinite( id ) || id <= 0 ) {
+	if ( ! Number.isInteger( id ) || id <= 0 ) {
 		return null;
 	}
 	return `/giving-day/v1/campaign/${ id }/active-matches`;

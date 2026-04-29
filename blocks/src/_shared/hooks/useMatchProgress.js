@@ -82,7 +82,7 @@ export function useMatchProgress( options = {} ) {
 						: [];
 					next = list[ 0 ] || null;
 				}
-				setData( next );
+				setData( ( prev ) => next !== null ? next : prev );
 				setError( null );
 				setLoading( false );
 				backoffRef.current = intervalMs;

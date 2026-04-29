@@ -612,7 +612,7 @@ function MatchHeader( {
 		<header className="giving-day-match__header">
 			<p className="giving-day-match__type">{ typeLabel }</p>
 			<h3 className="giving-day-match__title">{ title }</h3>
-			{ ( showSponsorLogo || showSponsorName ) && sponsorName && (
+			{ showSponsorName && sponsorName && (
 				<p className="giving-day-match__sponsor">
 					{ __( 'Sponsored by', 'giving-day-blocks' ) }{ ' ' }
 					<strong>{ sponsorName }</strong>

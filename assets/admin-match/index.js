@@ -22,6 +22,7 @@ import { registerPlugin } from '@wordpress/plugins';
 import { PluginDocumentSettingPanel } from '@wordpress/editor';
 import { useSelect } from '@wordpress/data';
 import { useEntityProp } from '@wordpress/core-data';
+import { useEffect, useState } from '@wordpress/element';
 import {
 	DateTimePicker,
 	SelectControl,
@@ -288,6 +289,13 @@ function MatchWindowPanel() {
 	const start = meta?.[ META.startDatetime ] || '';
 	const end = meta?.[ META.endDatetime ] || '';
 	const hasWindow = !! start || !! end;
+	const [ windowMode, setWindowMode ] = useState(
+		hasWindow ? 'window' : 'event'
+	);
+
+	useEffect( () => {
+		setWindowMode( hasWindow ? 'window' : 'event' );
+	}, [ hasWindow ] );
 
 	return (
 		<PluginDocumentSettingPanel
@@ -296,11 +304,15 @@ function MatchWindowPanel() {
 			className="giving-day-match-window"
 		>
 			<RadioControl
-				selected={ hasWindow ? 'window' : 'event' }
+				selected={ windowMode }
 				onChange={ ( value ) => {
+					setWindowMode( value );
 					if ( value === 'event' ) {
-						updateMeta( META.startDatetime, '' );
-						updateMeta( META.endDatetime, '' );
+						setMeta( {
+							...meta,
+							[ META.startDatetime ]: '',
+							[ META.endDatetime ]: '',
+						} );
 					}
 				} }
 				options={ [
@@ -321,7 +333,7 @@ function MatchWindowPanel() {
 				] }
 			/>
 
-			{ hasWindow && (
+			{ windowMode === 'window' && (
 				<>
 					<DateTimeField
 						label={ __( 'Start', 'giving-day-blocks' ) }
