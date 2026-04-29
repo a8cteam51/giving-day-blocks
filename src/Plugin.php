@@ -10,6 +10,8 @@ namespace Team51\GivingDay;
 
 use Team51\GivingDay\Admin\CampaignEditor;
 use Team51\GivingDay\Admin\MatchEditor;
+use Team51\GivingDay\Data\Context;
+use Team51\GivingDay\Integrations\OrderAttribution;
 use Team51\GivingDay\PostTypes\Beneficiary;
 use Team51\GivingDay\PostTypes\Campaign;
 use Team51\GivingDay\PostTypes\Challenge;
@@ -114,6 +116,13 @@ final class Plugin {
 	public ?MatchEditor $match_editor = null;
 
 	/**
+	 * Order attribution listener (tags WC orders with campaign context).
+	 *
+	 * @var OrderAttribution|null
+	 */
+	public ?OrderAttribution $order_attribution = null;
+
+	/**
 	 * Plugin constructor. Kept protected to enforce the singleton pattern.
 	 */
 	protected function __construct() {
@@ -200,5 +209,10 @@ final class Plugin {
 
 		$this->match_editor = new MatchEditor();
 		$this->match_editor->register();
+
+		Context::register_hooks();
+
+		$this->order_attribution = new OrderAttribution();
+		$this->order_attribution->register();
 	}
 }

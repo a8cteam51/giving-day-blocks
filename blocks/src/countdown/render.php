@@ -13,6 +13,7 @@
  */
 
 use Team51\GivingDay\Data\Colors;
+use Team51\GivingDay\Data\Context;
 use Team51\GivingDay\Data\Status;
 use Team51\GivingDay\PostTypes\Campaign;
 
@@ -32,6 +33,8 @@ $campaign = get_post($campaign_id);
 if (! $campaign || Campaign::POST_TYPE !== $campaign->post_type ) {
     return;
 }
+
+Context::set( $campaign_id );
 
 $status          = Status::resolve($campaign_id);
 $hide_post_event = ! empty($attributes['hidePostEvent']);

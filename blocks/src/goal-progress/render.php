@@ -13,6 +13,7 @@
  */
 
 use Team51\GivingDay\Data\Colors;
+use Team51\GivingDay\Data\Context;
 use Team51\GivingDay\Data\GoalProgress;
 
 defined( 'ABSPATH' ) || exit;
@@ -21,6 +22,8 @@ $campaign_id = isset( $attributes['campaignId'] ) ? (int) $attributes['campaignI
 if ( $campaign_id <= 0 ) {
 	return;
 }
+
+Context::set( $campaign_id );
 
 $progress = GoalProgress::resolve( GoalProgress::TYPE_CAMPAIGN, $campaign_id );
 if ( null === $progress ) {
