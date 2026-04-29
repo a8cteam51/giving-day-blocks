@@ -20,7 +20,7 @@
  * License URI:             https://www.gnu.org/licenses/gpl-3.0.html
  * Text Domain:             giving-day-blocks
  * Domain Path:             /languages
- * Requires Plugins:        team51-donations
+ * Requires Plugins:
  * WC requires at least:    7.5
  **/
 
@@ -63,14 +63,6 @@ function giving_day_blocks_get_unmet_dependencies(): array {
 		$unmet['woocommerce'] = array(
 			'label'  => __( 'WooCommerce', 'giving-day-blocks' ),
 			'reason' => __( 'Install and activate WooCommerce 7.5 or newer.', 'giving-day-blocks' ),
-		);
-	}
-
-	// team51-donations identifies itself via the WPCOMSP_DONATIONS_* constants defined in its bootstrap file.
-	if ( ! defined( 'WPCOMSP_DONATIONS_METADATA' ) ) {
-		$unmet['team51-donations'] = array(
-			'label'  => __( 'Team51 Donations (team51-donations)', 'giving-day-blocks' ),
-			'reason' => __( 'Install and activate team51-donations. Giving Day Blocks tags donation orders produced by that plugin with campaign metadata.', 'giving-day-blocks' ),
 		);
 	}
 

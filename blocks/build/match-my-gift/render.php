@@ -24,6 +24,7 @@
  */
 
 use Team51\GivingDay\Data\Colors;
+use Team51\GivingDay\Data\Context;
 use Team51\GivingDay\Data\MatchProgress;
 use Team51\GivingDay\PostTypes\Campaign;
 use Team51\GivingDay\PostTypes\GivingMatch;
@@ -42,6 +43,10 @@ $show_outside    = isset( $attributes['showOutsideWindow'] ) ? (string) $attribu
 
 if ( $campaign_id <= 0 && $forced_match_id <= 0 ) {
 	return;
+}
+
+if ( $campaign_id > 0 ) {
+	Context::set( $campaign_id );
 }
 
 $progress = null;
@@ -116,7 +121,7 @@ $wrapper_attrs = get_block_wrapper_attributes( $wrapper_extra );
 					<?php echo esc_html( $progress['title'] ); ?>
 				</h3>
 			<?php endif; ?>
-			<?php if ( '' !== $sponsor_name && ( $show_name || $show_logo ) ) : ?>
+			<?php if ( ( '' !== $sponsor_name || '' !== $sponsor_logo ) && ( $show_name || $show_logo ) ) : ?>
 				<p class="giving-day-match__sponsor" data-role="sponsor">
 					<?php if ( $show_logo && '' !== $sponsor_logo ) : ?>
 						<img

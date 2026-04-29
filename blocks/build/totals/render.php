@@ -10,6 +10,7 @@
  */
 
 use Team51\GivingDay\Data\Colors;
+use Team51\GivingDay\Data\Context;
 use Team51\GivingDay\Data\Status;
 use Team51\GivingDay\PostTypes\Campaign;
 
@@ -19,6 +20,8 @@ $campaign_id = isset($attributes['campaignId']) ? (int) $attributes['campaignId'
 if ($campaign_id <= 0 ) {
     return;
 }
+
+Context::set( $campaign_id );
 
 $campaign = get_post($campaign_id);
 if (! $campaign || Campaign::POST_TYPE !== $campaign->post_type ) {
