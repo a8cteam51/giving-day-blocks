@@ -41,17 +41,15 @@ final class Context {
 	);
 
 	/**
-	 * Sets the active attribution context.
+	 * Sets the active attribution context for this invocation.
 	 *
-	 * Callers pass only what they know — a block render path may set
-	 * campaign_id only; a Team single-post template_redirect will set
-	 * both campaign and team. Values are merged into the session so
-	 * multiple set() calls from different blocks on the same page
-	 * accumulate (last writer wins per key).
+	 * Replaces the stored payload (no merge with prior session values), so a
+	 * campaign-only caller clears team/beneficiary from a previous page view.
+	 * Later calls in the same request overwrite the full snapshot again.
 	 *
-	 * @param int      $campaign_id    Campaign post ID (0 = unknown).
-	 * @param int|null $team_id        Team post ID (null = leave unchanged).
-	 * @param int|null $beneficiary_id Beneficiary post ID (null = leave unchanged).
+	 * @param int      $campaign_id    Campaign post ID (0 = omit from payload).
+	 * @param int|null $team_id        Team post ID (>0 = set, null = clear to 0).
+	 * @param int|null $beneficiary_id Beneficiary post ID (>0 = set, null = clear to 0).
 	 */
 	public static function set( int $campaign_id, ?int $team_id = null, ?int $beneficiary_id = null ): void {
 		$session = self::session();
@@ -59,16 +57,15 @@ final class Context {
 			return;
 		}
 
-		$current = self::decode( $session->get( self::SESSION_KEY ) );
-
+		$current = array();
 		if ( $campaign_id > 0 ) {
 			$current['campaign_id'] = $campaign_id;
 		}
-		if ( null !== $team_id && $team_id > 0 ) {
-			$current['team_id'] = $team_id;
+		if ( null !== $team_id ) {
+			$current['team_id'] = ( $team_id > 0 ) ? $team_id : 0;
 		}
-		if ( null !== $beneficiary_id && $beneficiary_id > 0 ) {
-			$current['beneficiary_id'] = $beneficiary_id;
+		if ( null !== $beneficiary_id ) {
+			$current['beneficiary_id'] = ( $beneficiary_id > 0 ) ? $beneficiary_id : 0;
 		}
 
 		$session->set( self::SESSION_KEY, wp_json_encode( $current ) );
@@ -156,8 +153,37 @@ final class Context {
 			}
 		}
 
+		self::normalize_query_attribution( $campaign_id, $team_id, $beneficiary_id );
+
 		if ( $campaign_id > 0 || null !== $team_id || null !== $beneficiary_id ) {
 			self::set( $campaign_id, $team_id, $beneficiary_id );
+		}
+	}
+
+	/**
+	 * Aligns team/beneficiary with campaign meta and drops inconsistent IDs.
+	 *
+	 * @param int      $campaign_id    Updated by reference.
+	 * @param int|null $team_id        Updated by reference.
+	 * @param int|null $beneficiary_id Updated by reference.
+	 */
+	private static function normalize_query_attribution( int &$campaign_id, ?int &$team_id, ?int &$beneficiary_id ): void {
+		if ( null !== $team_id && $team_id > 0 ) {
+			$team_campaign = (int) get_post_meta( $team_id, '_giving_team_campaigns', true );
+			if ( $team_campaign <= 0 || ( $campaign_id > 0 && $campaign_id !== $team_campaign ) ) {
+				$team_id = null;
+			} else {
+				$campaign_id = $team_campaign;
+			}
+		}
+
+		if ( null !== $beneficiary_id && $beneficiary_id > 0 ) {
+			$ben_campaign = (int) get_post_meta( $beneficiary_id, '_giving_beneficiary_campaigns', true );
+			if ( $ben_campaign <= 0 || ( $campaign_id > 0 && $campaign_id !== $ben_campaign ) ) {
+				$beneficiary_id = null;
+			} else {
+				$campaign_id = $ben_campaign;
+			}
 		}
 	}
 
