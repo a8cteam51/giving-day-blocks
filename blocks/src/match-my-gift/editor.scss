@@ -1,0 +1,24 @@
+@import "./style";
+
+.wp-block[data-type="giving-day/match-my-gift"] {
+	.giving-day-match {
+		border: 1px dashed rgba(0, 0, 0, 0.12);
+	}
+
+	.giving-day-match__notice {
+		margin: 0 0 0.75rem;
+	}
+
+	.giving-day-match__hint {
+		margin: 0.5rem 0 0;
+		font-size: 0.8rem;
+		color: var(--wp-admin-theme-color, #555);
+	}
+
+	.giving-day-match__countdown-hint {
+		margin: 0.25rem 0 0;
+		font-size: 0.75rem;
+		color: var(--giving-day-muted);
+		font-style: italic;
+	}
+}

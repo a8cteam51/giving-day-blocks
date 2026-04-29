@@ -19,8 +19,10 @@
 namespace Team51\GivingDay;
 
 use Team51\GivingDay\Data\Colors;
+use Team51\GivingDay\Data\MatchProgress;
 use Team51\GivingDay\Data\Status;
 use Team51\GivingDay\PostTypes\Campaign;
+use Team51\GivingDay\PostTypes\GivingMatch;
 use WP_Error;
 use WP_Post;
 use WP_REST_Request;
@@ -78,6 +80,37 @@ final class REST {
 				'permission_callback' => '__return_true',
 				'args'                => $args,
 				'callback'            => array( $this, 'get_summary' ),
+			)
+		);
+
+		register_rest_route(
+			self::NAMESPACE,
+			'/campaign/(?P<id>\d+)/active-matches',
+			array(
+				'methods'             => WP_REST_Server::READABLE,
+				'permission_callback' => '__return_true',
+				'args'                => array(
+					'id' => $args['id'],
+				),
+				'callback'            => array( $this, 'get_active_matches' ),
+			)
+		);
+
+		register_rest_route(
+			self::NAMESPACE,
+			'/match/(?P<id>\d+)/progress',
+			array(
+				'methods'             => WP_REST_Server::READABLE,
+				'permission_callback' => '__return_true',
+				'args'                => array(
+					'id' => array(
+						'description'       => __( 'Match post ID.', 'giving-day-blocks' ),
+						'type'              => 'integer',
+						'required'          => true,
+						'validate_callback' => static fn( $value ) => is_numeric( $value ) && (int) $value > 0,
+					),
+				),
+				'callback'            => array( $this, 'get_match_progress' ),
 			)
 		);
 	}
@@ -150,6 +183,56 @@ final class REST {
 			'colors'        => Colors::for_campaign( $campaign_id ),
 			'server_time'   => gmdate( 'c' ),
 		);
+
+		return $this->respond( $payload );
+	}
+
+	/**
+	 * GET /campaign/{id}/active-matches
+	 *
+	 * Returns the list of matches whose window contains the current
+	 * server time and whose `active` flag is true, ordered by end-soonest
+	 * first. Each entry is a full match-progress payload so the common
+	 * single-match case doesn't need a second round-trip.
+	 *
+	 * @param WP_REST_Request $request
+	 * @return WP_REST_Response|WP_Error
+	 */
+	public function get_active_matches( WP_REST_Request $request ) {
+		$campaign_id = (int) $request['id'];
+		$campaign    = $this->locate_readable_campaign( $campaign_id );
+		if ( is_wp_error( $campaign ) ) {
+			return $campaign;
+		}
+
+		$matches = MatchProgress::active_for_campaign( $campaign_id );
+
+		return $this->respond(
+			array(
+				'campaign_id' => $campaign_id,
+				'matches'     => $matches,
+				'server_time' => gmdate( 'c' ),
+			)
+		);
+	}
+
+	/**
+	 * GET /match/{id}/progress
+	 *
+	 * @param WP_REST_Request $request
+	 * @return WP_REST_Response|WP_Error
+	 */
+	public function get_match_progress( WP_REST_Request $request ) {
+		$match_id = (int) $request['id'];
+		$payload  = MatchProgress::resolve( $match_id );
+
+		if ( null === $payload ) {
+			return new WP_Error(
+				'giving_day_blocks_match_not_found',
+				__( 'Match not found.', 'giving-day-blocks' ),
+				array( 'status' => 404 )
+			);
+		}
 
 		return $this->respond( $payload );
 	}

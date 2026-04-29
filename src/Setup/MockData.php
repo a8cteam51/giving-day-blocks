@@ -156,16 +156,18 @@ final class MockData {
 		);
 		$team_ids = array_values( array_filter( $team_ids ) );
 
-		$match_id     = $this->create_match( $campaign_id, $event_start );
-		$challenge_id = $this->create_challenge( $campaign_id );
+		$match_id        = $this->create_match( $campaign_id, $event_start );
+		$donor_match_id  = $this->create_donor_unlock_match( $campaign_id, $event_start );
+		$challenge_id    = $this->create_challenge( $campaign_id );
 
 		return array(
-			'campaign'    => $campaign_id,
-			'beneficiary' => $beneficiary_id,
-			'teams'       => $team_ids,
-			'match'       => $match_id,
-			'challenge'   => $challenge_id,
-			'terms'       => $terms,
+			'campaign'     => $campaign_id,
+			'beneficiary'  => $beneficiary_id,
+			'teams'        => $team_ids,
+			'match'        => $match_id,
+			'donor_match'  => $donor_match_id,
+			'challenge'    => $challenge_id,
+			'terms'        => $terms,
 		);
 	}
 
@@ -328,12 +330,49 @@ final class MockData {
 		$match_end = $event_start->modify( '+1 hour' );
 
 		update_post_meta( $post_id, GivingMatch::META_CAMPAIGN_ID, $campaign_id );
+		update_post_meta( $post_id, GivingMatch::META_TYPE, GivingMatch::TYPE_DOLLAR_FOR_DOLLAR );
 		update_post_meta( $post_id, GivingMatch::META_SPONSOR_NAME, __( 'Sample Sponsor', 'giving-day-blocks' ) );
 		update_post_meta( $post_id, GivingMatch::META_MULTIPLIER, 2 );
 		update_post_meta( $post_id, GivingMatch::META_CAP_AMOUNT, 10000 );
 		update_post_meta( $post_id, GivingMatch::META_START_DATETIME, $event_start->format( 'c' ) );
 		update_post_meta( $post_id, GivingMatch::META_END_DATETIME, $match_end->format( 'c' ) );
 		update_post_meta( $post_id, GivingMatch::META_ACTIVE, true );
+		update_post_meta( $post_id, GivingMatch::META_MATCHED_OVERRIDE, 3500 );
+
+		return (int) $post_id;
+	}
+
+	/**
+	 * Creates a second sample Match in the donor-unlock shape so editors
+	 * can preview both mechanics out of the box. Runs in the second hour
+	 * of the event so it doesn't overlap the dollar-for-dollar one.
+	 */
+	private function create_donor_unlock_match( int $campaign_id, \DateTimeImmutable $event_start ): int {
+		$post_id = wp_insert_post(
+			array(
+				'post_type'   => GivingMatch::POST_TYPE,
+				'post_status' => 'publish',
+				'post_title'  => __( 'Sample Donor-Unlock Match', 'giving-day-blocks' ),
+			),
+			true
+		);
+
+		if ( is_wp_error( $post_id ) || ! $post_id ) {
+			return 0;
+		}
+
+		$start = $event_start->modify( '+1 hour' );
+		$end   = $event_start->modify( '+2 hours' );
+
+		update_post_meta( $post_id, GivingMatch::META_CAMPAIGN_ID, $campaign_id );
+		update_post_meta( $post_id, GivingMatch::META_TYPE, GivingMatch::TYPE_DONOR_UNLOCK );
+		update_post_meta( $post_id, GivingMatch::META_SPONSOR_NAME, __( 'Sample Sponsor', 'giving-day-blocks' ) );
+		update_post_meta( $post_id, GivingMatch::META_DONOR_THRESHOLD, 100 );
+		update_post_meta( $post_id, GivingMatch::META_UNLOCK_AMOUNT, 5000 );
+		update_post_meta( $post_id, GivingMatch::META_START_DATETIME, $start->format( 'c' ) );
+		update_post_meta( $post_id, GivingMatch::META_END_DATETIME, $end->format( 'c' ) );
+		update_post_meta( $post_id, GivingMatch::META_ACTIVE, true );
+		update_post_meta( $post_id, GivingMatch::META_DONORS_OVERRIDE, 73 );
 
 		return (int) $post_id;
 	}
