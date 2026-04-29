@@ -9,6 +9,7 @@
 namespace Team51\GivingDay;
 
 use Team51\GivingDay\Admin\CampaignEditor;
+use Team51\GivingDay\Admin\MatchEditor;
 use Team51\GivingDay\PostTypes\Beneficiary;
 use Team51\GivingDay\PostTypes\Campaign;
 use Team51\GivingDay\PostTypes\Challenge;
@@ -106,6 +107,13 @@ final class Plugin {
 	public ?CampaignEditor $campaign_editor = null;
 
 	/**
+	 * Match edit screen UI (Gutenberg sidebar panel).
+	 *
+	 * @var MatchEditor|null
+	 */
+	public ?MatchEditor $match_editor = null;
+
+	/**
 	 * Plugin constructor. Kept protected to enforce the singleton pattern.
 	 */
 	protected function __construct() {
@@ -189,5 +197,8 @@ final class Plugin {
 
 		$this->campaign_editor = new CampaignEditor();
 		$this->campaign_editor->register();
+
+		$this->match_editor = new MatchEditor();
+		$this->match_editor->register();
 	}
 }

@@ -1,0 +1,164 @@
+@import "../_shared/tokens";
+
+.giving-day-match {
+	background: var(--giving-day-surface);
+	color: var(--giving-day-secondary);
+	padding: 1.25rem;
+	border-radius: var(--giving-day-radius);
+	border: 1px solid color-mix(in srgb, var(--giving-day-primary) 15%, transparent);
+
+	&__inner {
+		display: flex;
+		flex-direction: column;
+		gap: 0.5rem;
+	}
+
+	&__header {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: baseline;
+		row-gap: 0.25rem;
+		column-gap: 0.5rem;
+	}
+
+	&__type {
+		margin: 0;
+		font-size: 0.75rem;
+		font-weight: 700;
+		letter-spacing: 0.06em;
+		text-transform: uppercase;
+		color: var(--giving-day-accent);
+	}
+
+	&__title {
+		margin: 0;
+		font-size: clamp(1.05rem, 2.4vw, 1.25rem);
+		font-weight: 700;
+		color: var(--giving-day-secondary);
+		flex-basis: 100%;
+	}
+
+	&__sponsor {
+		margin: 0;
+		display: inline-flex;
+		align-items: center;
+		gap: 0.5rem;
+		color: var(--giving-day-muted);
+		font-size: 0.9rem;
+		flex-basis: 100%;
+	}
+
+	&__logo {
+		max-height: 1.5rem;
+		width: auto;
+		display: inline-block;
+	}
+
+	&__headline {
+		margin: 0.25rem 0 0;
+		font-size: clamp(1.1rem, 2.6vw, 1.4rem);
+		font-weight: 700;
+		color: var(--giving-day-primary);
+		font-variant-numeric: tabular-nums;
+	}
+
+	&__track {
+		position: relative;
+		overflow: hidden;
+		background: color-mix(in srgb, var(--giving-day-primary) 12%, var(--giving-day-surface));
+		border-radius: 999px;
+		min-height: 0.75rem;
+		height: 0.75rem;
+
+		@include media(sm) {
+			height: 1rem;
+		}
+	}
+
+	&__fill {
+		display: block;
+		height: 100%;
+		width: 0%;
+		background: var(--giving-day-primary);
+		border-radius: inherit;
+	}
+
+	&__meta {
+		margin: 0;
+		font-size: 0.95rem;
+		color: var(--giving-day-muted);
+		font-variant-numeric: tabular-nums;
+	}
+
+	&__countdown {
+		margin: 0.25rem 0 0;
+		font-size: 0.95rem;
+		font-weight: 600;
+		color: var(--giving-day-secondary);
+		font-variant-numeric: tabular-nums;
+
+		&--scheduled {
+			color: var(--giving-day-muted);
+		}
+	}
+
+	// Banner: full-width strip, denser typography, single-row layout on
+	// wide screens so the countdown can sit on the right.
+	&--banner {
+		padding: 0.85rem 1.25rem;
+		border-radius: 0;
+		border-left: none;
+		border-right: none;
+
+		.giving-day-match__inner {
+			gap: 0.4rem;
+		}
+
+		@include media(md) {
+			.giving-day-match__inner {
+				display: grid;
+				grid-template-columns: minmax(0, 1fr) auto;
+				grid-template-areas:
+					"header   countdown"
+					"headline countdown"
+					"track    track"
+					"meta     meta";
+				column-gap: 1.5rem;
+				align-items: center;
+			}
+
+			.giving-day-match__header {
+				grid-area: header;
+			}
+
+			.giving-day-match__headline {
+				grid-area: headline;
+				margin: 0;
+			}
+
+			.giving-day-match__track {
+				grid-area: track;
+			}
+
+			.giving-day-match__meta {
+				grid-area: meta;
+			}
+
+			.giving-day-match__countdown {
+				grid-area: countdown;
+				justify-self: end;
+				font-size: 1.05rem;
+			}
+		}
+	}
+
+	// State affordances: dim a completed/exhausted match so the bar +
+	// celebratory headline stay readable but the block visually retreats.
+	&--state-completed,
+	&--state-exhausted,
+	&--state-unlocked {
+		.giving-day-match__type {
+			color: var(--giving-day-muted);
+		}
+	}
+}

@@ -1,0 +1,77 @@
+{
+	"$schema": "https://schemas.wp.org/trunk/block.json",
+	"apiVersion": 3,
+	"name": "giving-day/match-my-gift",
+	"version": "0.1.0",
+	"title": "Giving Day: Match My Gift",
+	"category": "widgets",
+	"icon": "heart",
+	"description": "Highlights an active sponsor match. Shows live progress (dollars matched, or donors so far) and a window countdown. Auto-selects the most-urgent active match by default.",
+	"keywords": [
+		"giving day",
+		"match",
+		"sponsor",
+		"fundraiser"
+	],
+	"textdomain": "giving-day-blocks",
+	"supports": {
+		"html": false,
+		"color": {
+			"background": true,
+			"text": true
+		},
+		"spacing": {
+			"margin": true,
+			"padding": true
+		},
+		"typography": {
+			"fontSize": true
+		},
+		"align": [ "wide", "full" ]
+	},
+	"attributes": {
+		"campaignId": {
+			"type": "number"
+		},
+		"matchSelection": {
+			"type": "string",
+			"default": "auto",
+			"enum": [ "auto", "specific" ]
+		},
+		"matchId": {
+			"type": "number"
+		},
+		"variant": {
+			"type": "string",
+			"default": "card",
+			"enum": [ "banner", "card" ]
+		},
+		"showSponsorLogo": {
+			"type": "boolean",
+			"default": true
+		},
+		"showSponsorName": {
+			"type": "boolean",
+			"default": true
+		},
+		"showCountdown": {
+			"type": "boolean",
+			"default": true
+		},
+		"hideWhenComplete": {
+			"type": "string",
+			"default": "hide",
+			"enum": [ "hide", "show-goal-reached" ]
+		},
+		"showOutsideWindow": {
+			"type": "string",
+			"default": "hide",
+			"enum": [ "hide", "show-scheduled", "show-ended" ]
+		}
+	},
+	"editorScript": "file:./index.js",
+	"viewScript": "file:./view.js",
+	"style": "file:./style-index.css",
+	"editorStyle": "file:./index.css",
+	"render": "file:./render.php"
+}
