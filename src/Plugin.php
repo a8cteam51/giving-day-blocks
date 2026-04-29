@@ -11,6 +11,7 @@ namespace Team51\GivingDay;
 use Team51\GivingDay\Admin\CampaignEditor;
 use Team51\GivingDay\Admin\MatchEditor;
 use Team51\GivingDay\Data\Context;
+use Team51\GivingDay\Data\Leaderboard;
 use Team51\GivingDay\Integrations\OrderAttribution;
 use Team51\GivingDay\PostTypes\Beneficiary;
 use Team51\GivingDay\PostTypes\Campaign;
@@ -214,5 +215,7 @@ final class Plugin {
 
 		$this->order_attribution = new OrderAttribution();
 		$this->order_attribution->register();
+
+		Leaderboard::register_hooks();
 	}
 }

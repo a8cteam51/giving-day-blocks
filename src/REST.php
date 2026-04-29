@@ -19,10 +19,12 @@
 namespace Team51\GivingDay;
 
 use Team51\GivingDay\Data\Colors;
+use Team51\GivingDay\Data\Leaderboard;
 use Team51\GivingDay\Data\MatchProgress;
 use Team51\GivingDay\Data\Status;
 use Team51\GivingDay\PostTypes\Campaign;
 use Team51\GivingDay\PostTypes\GivingMatch;
+use Team51\GivingDay\Taxonomies\TeamCategory;
 use WP_Error;
 use WP_Post;
 use WP_REST_Request;
@@ -111,6 +113,73 @@ final class REST {
 					),
 				),
 				'callback'            => array( $this, 'get_match_progress' ),
+			)
+		);
+
+		$leaderboard_args = array_merge(
+			$args,
+			array(
+				'dimension' => array(
+					'description' => __( 'Leaderboard dimension.', 'giving-day-blocks' ),
+					'type'        => 'string',
+					'required'    => true,
+					'enum'        => array(
+						Leaderboard::DIMENSION_DONORS,
+						Leaderboard::DIMENSION_TEAMS,
+						Leaderboard::DIMENSION_BENEFICIARIES,
+						Leaderboard::DIMENSION_CAUSES,
+					),
+				),
+				'limit' => array(
+					'description' => __( 'Maximum rows per list (1–100).', 'giving-day-blocks' ),
+					'type'        => 'integer',
+					'default'     => 10,
+					'minimum'     => 1,
+					'maximum'     => 100,
+				),
+				'filter_term_id' => array(
+					'description' => __( 'Optional team category or cause term ID to narrow results.', 'giving-day-blocks' ),
+					'type'        => 'integer',
+					'default'     => 0,
+				),
+				'group_by_parent_term_id' => array(
+					'description' => __( 'Optional parent team category term ID; returns one sub-list per child term.', 'giving-day-blocks' ),
+					'type'        => 'integer',
+					'default'     => 0,
+				),
+				'anonymize' => array(
+					'description' => __( 'When true, donor names and avatars are redacted for top_donors.', 'giving-day-blocks' ),
+					'type'        => 'boolean',
+					'default'     => false,
+				),
+			)
+		);
+
+		register_rest_route(
+			self::NAMESPACE,
+			'/campaign/(?P<id>\d+)/leaderboard',
+			array(
+				'methods'             => WP_REST_Server::READABLE,
+				'permission_callback' => '__return_true',
+				'args'                => $leaderboard_args,
+				'callback'            => array( $this, 'get_leaderboard' ),
+			)
+		);
+
+		register_rest_route(
+			self::NAMESPACE,
+			'/team-categories',
+			array(
+				'methods'             => WP_REST_Server::READABLE,
+				'permission_callback' => '__return_true',
+				'args'                => array(
+					'parent' => array(
+						'description' => __( 'Parent term ID; use 0 for top-level terms.', 'giving-day-blocks' ),
+						'type'        => 'integer',
+						'default'     => 0,
+					),
+				),
+				'callback'            => array( $this, 'get_team_categories' ),
 			)
 		);
 	}
@@ -235,6 +304,109 @@ final class REST {
 		}
 
 		return $this->respond( $payload );
+	}
+
+	/**
+	 * GET /campaign/{id}/leaderboard
+	 *
+	 * @param WP_REST_Request $request Request.
+	 * @return WP_REST_Response|WP_Error
+	 */
+	public function get_leaderboard( WP_REST_Request $request ) {
+		$campaign_id = (int) $request['id'];
+		$campaign    = $this->locate_readable_campaign( $campaign_id );
+		if ( is_wp_error( $campaign ) ) {
+			return $campaign;
+		}
+
+		$dimension = (string) $request->get_param( 'dimension' );
+		$limit     = (int) $request->get_param( 'limit' );
+		if ( $limit <= 0 ) {
+			$limit = 10;
+		}
+
+		$args = array(
+			'filter_term_id'            => (int) $request->get_param( 'filter_term_id' ),
+			'group_by_parent_term_id'   => (int) $request->get_param( 'group_by_parent_term_id' ),
+		);
+
+		$preview = $this->preview_override_from_request( $request );
+
+		$payload = Leaderboard::fetch( $campaign_id, $dimension, $limit, $args, $preview );
+		if ( isset( $payload['error'] ) && 'invalid_dimension' === $payload['error'] ) {
+			return new WP_Error(
+				'giving_day_blocks_invalid_leaderboard_dimension',
+				__( 'Invalid leaderboard dimension.', 'giving-day-blocks' ),
+				array( 'status' => 400 )
+			);
+		}
+
+		$anonymize = filter_var(
+			$request->get_param( 'anonymize' ),
+			FILTER_VALIDATE_BOOLEAN,
+			FILTER_NULL_ON_FAILURE
+		);
+		$anonymize = (bool) $anonymize;
+		if ( Leaderboard::DIMENSION_DONORS === $dimension && $anonymize ) {
+			if ( isset( $payload['rows'] ) && is_array( $payload['rows'] ) ) {
+				$payload['rows'] = Leaderboard::apply_anonymize( $payload['rows'], true );
+			}
+			if ( isset( $payload['groups'] ) && is_array( $payload['groups'] ) ) {
+				foreach ( $payload['groups'] as &$group ) {
+					if ( isset( $group['rows'] ) && is_array( $group['rows'] ) ) {
+						$group['rows'] = Leaderboard::apply_anonymize( $group['rows'], true );
+					}
+				}
+				unset( $group );
+			}
+		}
+
+		return $this->respond( $payload );
+	}
+
+	/**
+	 * GET /team-categories
+	 *
+	 * @param WP_REST_Request $request Request.
+	 * @return WP_REST_Response
+	 */
+	public function get_team_categories( WP_REST_Request $request ): WP_REST_Response {
+		$parent = (int) $request->get_param( 'parent' );
+		if ( $parent < 0 ) {
+			$parent = 0;
+		}
+
+		$terms = get_terms(
+			array(
+				'taxonomy'   => TeamCategory::TAXONOMY,
+				'parent'     => $parent,
+				'hide_empty' => false,
+				'orderby'    => 'name',
+				'order'      => 'ASC',
+			)
+		);
+
+		$out = array();
+		if ( is_array( $terms ) ) {
+			foreach ( $terms as $term ) {
+				if ( ! $term instanceof \WP_Term || is_wp_error( $term ) ) {
+					continue;
+				}
+				$out[] = array(
+					'id'     => (int) $term->term_id,
+					'name'   => $term->name,
+					'slug'   => $term->slug,
+					'parent' => (int) $term->parent,
+				);
+			}
+		}
+
+		return $this->respond(
+			array(
+				'terms'       => $out,
+				'server_time' => gmdate( 'c' ),
+			)
+		);
 	}
 
 	/**

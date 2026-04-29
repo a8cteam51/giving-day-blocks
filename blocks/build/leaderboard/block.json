@@ -1,0 +1,90 @@
+{
+  "$schema": "https://schemas.wp.org/trunk/block.json",
+  "apiVersion": 3,
+  "name": "giving-day/leaderboard",
+  "version": "0.1.0",
+  "title": "Giving Day: Leaderboard",
+  "category": "widgets",
+  "icon": "awards",
+  "description": "Top donors, teams, beneficiaries, or causes for a campaign. Optional taxonomy filters and grouped team-category views.",
+  "keywords": [
+    "giving day",
+    "leaderboard",
+    "donors",
+    "teams"
+  ],
+  "textdomain": "giving-day-blocks",
+  "usesContext": [
+    "giving-day/parentCampaignId"
+  ],
+  "supports": {
+    "html": false,
+    "color": {
+      "background": true,
+      "text": true
+    },
+    "spacing": {
+      "margin": true,
+      "padding": true
+    },
+    "typography": {
+      "fontSize": true
+    },
+    "align": [
+      "wide",
+      "full"
+    ]
+  },
+  "attributes": {
+    "campaignId": {
+      "type": "number"
+    },
+    "tabLabel": {
+      "type": "string",
+      "default": ""
+    },
+    "dimension": {
+      "type": "string",
+      "default": "top_teams",
+      "enum": [
+        "top_donors",
+        "top_teams",
+        "top_beneficiaries",
+        "top_causes"
+      ]
+    },
+    "limit": {
+      "type": "number",
+      "default": 10
+    },
+    "filterTermId": {
+      "type": "number",
+      "default": 0
+    },
+    "groupByParentTermId": {
+      "type": "number",
+      "default": 0
+    },
+    "showAmount": {
+      "type": "boolean",
+      "default": true
+    },
+    "showAvatar": {
+      "type": "boolean",
+      "default": true
+    },
+    "anonymize": {
+      "type": "boolean",
+      "default": false
+    },
+    "refreshInterval": {
+      "type": "number",
+      "default": 15000
+    }
+  },
+  "editorScript": "file:./index.js",
+  "viewScript": "file:./view.js",
+  "style": "file:./style-index.css",
+  "editorStyle": "file:./index.css",
+  "render": "file:./render.php"
+}

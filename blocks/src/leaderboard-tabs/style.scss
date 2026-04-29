@@ -1,0 +1,44 @@
+@use "../_shared/tokens" as gd;
+
+.giving-day-leaderboard-tabs {
+	&__tablist {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.35rem;
+		margin: 0 0 1rem;
+		padding: 0;
+		list-style: none;
+		border-bottom: 1px solid
+			color-mix(in srgb, var(--giving-day-muted) 35%, transparent);
+	}
+
+	&__tab {
+		appearance: none;
+		margin: 0 0 -1px;
+		padding: 0.5rem 0.85rem;
+		font: inherit;
+		font-weight: 500;
+		cursor: pointer;
+		color: inherit;
+		background: transparent;
+		border: 1px solid transparent;
+		border-bottom: none;
+		border-radius: var(--giving-day-radius) var(--giving-day-radius) 0 0;
+
+		&:focus-visible {
+			outline: 2px solid var(--giving-day-primary);
+			outline-offset: 2px;
+		}
+
+		&[aria-selected="true"] {
+			background: var(--giving-day-surface);
+			border-color: color-mix(in srgb, var(--giving-day-muted) 35%, transparent);
+			border-bottom-color: var(--giving-day-surface);
+			color: var(--giving-day-primary);
+		}
+	}
+
+	&__panel[hidden] {
+		display: none;
+	}
+}
