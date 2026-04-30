@@ -10,10 +10,11 @@ namespace Team51\GivingDay;
 
 use Team51\GivingDay\Admin\CampaignEditor;
 use Team51\GivingDay\Admin\Menu as AdminMenu;
-use Team51\GivingDay\Admin\ScreenIntro;
 use Team51\GivingDay\Admin\MatchEditor;
+use Team51\GivingDay\Admin\ScreenIntro;
 use Team51\GivingDay\Data\Context;
 use Team51\GivingDay\Data\Leaderboard;
+use Team51\GivingDay\Frontend\SingleTemplates;
 use Team51\GivingDay\Integrations\OrderAttribution;
 use Team51\GivingDay\PostTypes\Beneficiary;
 use Team51\GivingDay\PostTypes\Campaign;
@@ -33,6 +34,11 @@ defined( 'ABSPATH' ) || exit;
  * (REST, Aggregator, Blocks, Admin) will be registered here as they land.
  */
 final class Plugin {
+
+	/**
+	 * Bump when CPT/tax rewrite args change so permalinks are regenerated.
+	 */
+	private const REWRITE_RULES_VERSION = 2;
 
 	/**
 	 * The Campaign custom post type component.
@@ -192,6 +198,8 @@ final class Plugin {
 		$this->beneficiary = new Beneficiary();
 		$this->beneficiary->register();
 
+		SingleTemplates::register();
+
 		$this->cause = new Cause();
 		$this->cause->register();
 
@@ -223,5 +231,21 @@ final class Plugin {
 		$this->order_attribution->register();
 
 		Leaderboard::register_hooks();
+
+		add_action( 'init', array( $this, 'maybe_flush_rewrite_rules' ), 1000 );
+	}
+
+	/**
+	 * Flushes rewrite rules once after deploy when {@see self::REWRITE_RULES_VERSION} increases.
+	 *
+	 * @return void
+	 */
+	public function maybe_flush_rewrite_rules(): void {
+		$stored = (int) get_option( 'giving_day_blocks_rewrite_version', 0 );
+		if ( $stored >= self::REWRITE_RULES_VERSION ) {
+			return;
+		}
+		flush_rewrite_rules( false );
+		update_option( 'giving_day_blocks_rewrite_version', self::REWRITE_RULES_VERSION, true );
 	}
 }

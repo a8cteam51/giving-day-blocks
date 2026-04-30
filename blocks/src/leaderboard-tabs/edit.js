@@ -88,7 +88,7 @@ export default function Edit( { attributes, setAttributes, clientId } ) {
 		}
 		try {
 			const res = await apiFetch( {
-				path: '/giving-day/v1/team-groups?parent=0',
+				path: `/giving-day/v1/campaign/${ campaignId }/team-groups?parent=0`,
 			} );
 			const terms = res?.terms || [];
 			if ( ! Array.isArray( terms ) || terms.length === 0 ) {
