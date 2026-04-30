@@ -33,12 +33,6 @@ defined( 'ABSPATH' ) || exit;
  * Leaderboard block accepts `filterTermId` and `groupByParentTermId` attrs
  * so that a tab like "Class Year" renders one sub-leaderboard per child of
  * the "Class Year" parent term.
- *
- * Renamed from the original `giving_team_category` slug to "Team Group"
- * for two reasons: "Category" is generic and collides with WordPress's
- * built-in `category` taxonomy in conversation, and "Group" matches how
- * organizers actually talk about these buckets ("our class-year groups",
- * "athletic groups").
  */
 final class TeamGroup extends AbstractTaxonomy {
 
