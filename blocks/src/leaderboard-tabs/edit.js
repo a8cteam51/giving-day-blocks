@@ -96,6 +96,7 @@ export default function Edit( { attributes, setAttributes, clientId } ) {
 			}
 			const blocks = terms.map( ( t ) =>
 				createBlock( 'giving-day/leaderboard', {
+					campaignId,
 					tabLabel: t.name,
 					dimension: 'top_teams',
 					groupByParentTermId: t.id,

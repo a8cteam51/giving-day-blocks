@@ -309,7 +309,7 @@ single-CPT.
 When there's no real hierarchy to model, beneficiaries are flat top-level
 posts. The free-form `_giving_beneficiary_parent_org` label provides an
 optional display string (e.g. coalition or umbrella name) without a parent
-post. {@see Beneficiary::display_unit_label()} resolves the right label for
+post. `Beneficiary::display_unit_label()` in the plugin resolves the right label for
 either shape — parent post title when set, otherwise this string.
 
 ```

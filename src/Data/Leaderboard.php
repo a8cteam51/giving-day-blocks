@@ -491,7 +491,19 @@ final class Leaderboard {
 	}
 
 	private static function team_has_term( int $team_id, int $term_id ): bool {
-		return has_term( $term_id, TeamGroup::TAXONOMY, $team_id );
+		$terms = get_the_terms( $team_id, TeamGroup::TAXONOMY );
+		if ( ! is_array( $terms ) ) {
+			return false;
+		}
+		foreach ( $terms as $term ) {
+			if ( ! $term instanceof \WP_Term ) {
+				continue;
+			}
+			if ( self::term_is_descendant_or_self( (int) $term->term_id, $term_id, TeamGroup::TAXONOMY ) ) {
+				return true;
+			}
+		}
+		return false;
 	}
 
 	private static function beneficiary_in_cause_subtree( int $beneficiary_id, int $cause_term_id ): bool {
@@ -541,11 +553,12 @@ final class Leaderboard {
 	/**
 	 * True when $term_id is $ancestor_id or a descendant of $ancestor_id.
 	 */
-	private static function term_is_descendant_or_self( int $term_id, int $ancestor_id ): bool {
+	private static function term_is_descendant_or_self( int $term_id, int $ancestor_id, ?string $taxonomy = null ): bool {
+		$taxonomy = $taxonomy ?? Cause::TAXONOMY;
 		if ( $term_id === $ancestor_id ) {
 			return true;
 		}
-		$anc = get_ancestors( $term_id, Cause::TAXONOMY );
+		$anc = get_ancestors( $term_id, $taxonomy );
 		return in_array( $ancestor_id, $anc, true );
 	}
 
