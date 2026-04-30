@@ -168,16 +168,19 @@ final class REST {
 
 		register_rest_route(
 			self::NAMESPACE,
-			'/team-groups',
+			'/campaign/(?P<id>\d+)/team-groups',
 			array(
 				'methods'             => WP_REST_Server::READABLE,
 				'permission_callback' => '__return_true',
-				'args'                => array(
-					'parent' => array(
-						'description' => __( 'Parent term ID; use 0 for top-level terms.', 'giving-day-blocks' ),
-						'type'        => 'integer',
-						'default'     => 0,
-					),
+				'args'                => array_merge(
+					$args,
+					array(
+						'parent' => array(
+							'description' => __( 'Parent term ID; use 0 for top-level terms.', 'giving-day-blocks' ),
+							'type'        => 'integer',
+							'default'     => 0,
+						),
+					)
 				),
 				'callback'            => array( $this, 'get_team_groups' ),
 			)
@@ -365,12 +368,22 @@ final class REST {
 	}
 
 	/**
-	 * GET /team-groups
+	 * GET /campaign/{id}/team-groups
+	 *
+	 * Lightweight `giving_team_group` listing for editor tooling (not the taxonomy
+	 * REST collection at `…/team-groups`). Scoped under a campaign for consistent
+	 * URL layout and the same read rules as other campaign GET endpoints.
 	 *
 	 * @param WP_REST_Request $request Request.
-	 * @return WP_REST_Response
+	 * @return WP_REST_Response|WP_Error
 	 */
-	public function get_team_groups( WP_REST_Request $request ): WP_REST_Response {
+	public function get_team_groups( WP_REST_Request $request ) {
+		$campaign_id = (int) $request['id'];
+		$readable = $this->locate_readable_campaign( $campaign_id );
+		if ( is_wp_error( $readable ) ) {
+			return $readable;
+		}
+
 		$parent = (int) $request->get_param( 'parent' );
 		if ( $parent < 0 ) {
 			$parent = 0;
