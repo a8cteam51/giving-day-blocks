@@ -61,7 +61,11 @@ if ( $campaign_id <= 0 ) {
 }
 
 $campaign = get_post( $campaign_id );
-if ( ! $campaign || Campaign::POST_TYPE !== $campaign->post_type ) {
+if (
+	! $campaign
+	|| Campaign::POST_TYPE !== $campaign->post_type
+	|| ( 'publish' !== $campaign->post_status && ! current_user_can( 'read_post', $campaign->ID ) )
+) {
 	return;
 }
 
@@ -122,6 +126,7 @@ $query_payload = array(
 	'groupByParentTermId'   => $group_by_parent,
 	'anonymize'             => $anonymize,
 );
+$list_class = 'giving-day-leaderboard__list' . ( $show_avatar ? '' : ' giving-day-leaderboard__list--no-avatar' );
 
 $wrapper_attrs = get_block_wrapper_attributes(
 	array(
@@ -136,7 +141,7 @@ $wrapper_attrs = get_block_wrapper_attributes(
 		'data-show-avatar'         => $show_avatar ? '1' : '0',
 		'data-refresh-ms'          => (string) max( 5000, $refresh_interval ),
 		'data-tab-label'           => esc_attr( $tab_label ),
-		'data-tab-slug'            => esc_attr( sanitize_title( $tab_label !== '' ? $tab_label : 'tab-' . (string) $campaign_id ) ),
+		'data-tab-slug'            => esc_attr( sanitize_title( '' !== $tab_label ? $tab_label : 'tab-' . (string) $campaign_id ) ),
 		'data-initial'             => esc_attr( wp_json_encode( $data ) ),
 		'data-query'               => esc_attr( wp_json_encode( $query_payload ) ),
 	)
@@ -158,7 +163,7 @@ $wrapper_attrs = get_block_wrapper_attributes(
 					<?php if ( array() === $g_rows ) : ?>
 						<p class="giving-day-leaderboard__empty"><?php esc_html_e( 'No entries yet.', 'giving-day-blocks' ); ?></p>
 					<?php else : ?>
-						<ol class="giving-day-leaderboard__list">
+						<ol class="<?php echo esc_attr( $list_class ); ?>">
 							<?php
 							foreach ( $g_rows as $row ) {
 								giving_day_blocks_render_leaderboard_row( $row, $show_amount, $show_avatar, $price_fmt );
@@ -171,7 +176,7 @@ $wrapper_attrs = get_block_wrapper_attributes(
 			endforeach;
 		elseif ( ! empty( $data['rows'] ) && is_array( $data['rows'] ) ) :
 			?>
-			<ol class="giving-day-leaderboard__list">
+			<ol class="<?php echo esc_attr( $list_class ); ?>">
 				<?php
 				foreach ( $data['rows'] as $row ) {
 					giving_day_blocks_render_leaderboard_row( $row, $show_amount, $show_avatar, $price_fmt );

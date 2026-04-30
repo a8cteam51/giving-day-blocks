@@ -10,12 +10,17 @@
  * @param {boolean} [query.anonymize]
  * @return {string} Full REST path including `?` query when needed.
  */
-export function leaderboardRestPath( campaignId, query ) {
+export function leaderboardRestPath( campaignId, query = {} ) {
 	const params = new URLSearchParams();
 	params.set( 'dimension', query.dimension || 'top_teams' );
+	const limit = Number( query.limit );
 	params.set(
 		'limit',
-		String( query.limit && query.limit > 0 ? query.limit : 10 )
+		String(
+			Number.isFinite( limit ) && limit > 0
+				? Math.min( limit, 100 )
+				: 10
+		)
 	);
 	if ( query.filterTermId ) {
 		params.set( 'filter_term_id', String( query.filterTermId ) );

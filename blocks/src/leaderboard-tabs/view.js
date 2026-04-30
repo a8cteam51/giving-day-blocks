@@ -11,19 +11,21 @@ function slugFromPanel( panel ) {
 	return `tab-${ panel?.dataset?.campaignId || '0' }`;
 }
 
-function readHashTab() {
+function readHashTab( instanceId ) {
 	if ( typeof window === 'undefined' ) {
 		return null;
 	}
-	const m = window.location.hash.match( /^#tab=([^&]+)/ );
+	const m = window.location.hash.match(
+		new RegExp( `^#tab-${ instanceId }=([^&]+)$` )
+	);
 	return m ? decodeURIComponent( m[ 1 ] ) : null;
 }
 
-function setHashTab( slug ) {
+function setHashTab( instanceId, slug ) {
 	if ( typeof window === 'undefined' || ! slug ) {
 		return;
 	}
-	const next = `#tab=${ encodeURIComponent( slug ) }`;
+	const next = `#tab-${ instanceId }=${ encodeURIComponent( slug ) }`;
 	if ( window.location.hash !== next ) {
 		const url = `${ window.location.pathname }${ window.location.search }${ next }`;
 		window.history.replaceState( null, '', url );
@@ -57,9 +59,10 @@ function initTabs( root ) {
 	);
 
 	const tabs = [];
+	const instanceId = root.dataset.tabsInstanceId || '0';
 
 	let selected = defaultIdx;
-	const hashSlug = readHashTab();
+	const hashSlug = readHashTab( instanceId );
 	if ( hashSlug ) {
 		const idx = panels.findIndex(
 			( p ) => slugFromPanel( p ) === hashSlug
@@ -78,10 +81,10 @@ function initTabs( root ) {
 
 		const tabId = `gd-lb-tab-${
 			root.dataset.campaignId || '0'
-		}-${ index }`;
+		}-${ instanceId }-${ index }`;
 		const panelId = `gd-lb-panel-${
 			root.dataset.campaignId || '0'
-		}-${ index }`;
+		}-${ instanceId }-${ index }`;
 
 		panel.id = panelId;
 		panel.setAttribute( 'role', 'tabpanel' );
@@ -135,7 +138,7 @@ function initTabs( root ) {
 		if ( focusTab ) {
 			tabs[ selected ]?.focus( { preventScroll: true } );
 		}
-		setHashTab( slugFromPanel( panels[ selected ] ) );
+		setHashTab( instanceId, slugFromPanel( panels[ selected ] ) );
 	};
 
 	tabs.forEach( ( btn, index ) => {
@@ -173,7 +176,7 @@ function initTabs( root ) {
 	} );
 
 	window.addEventListener( 'hashchange', () => {
-		const slug = readHashTab();
+		const slug = readHashTab( instanceId );
 		if ( ! slug ) {
 			return;
 		}
@@ -185,9 +188,15 @@ function initTabs( root ) {
 }
 
 function boot() {
-	document
-		.querySelectorAll( '.giving-day-leaderboard-tabs[data-campaign-id]' )
-		.forEach( initTabs );
+	const roots = document.querySelectorAll(
+		'.giving-day-leaderboard-tabs[data-campaign-id]'
+	);
+	roots.forEach( ( root, index ) => {
+		if ( ! root.dataset.tabsInstanceId ) {
+			root.dataset.tabsInstanceId = String( index + 1 );
+		}
+		initTabs( root );
+	} );
 }
 
 if ( document.readyState === 'loading' ) {

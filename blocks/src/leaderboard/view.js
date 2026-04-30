@@ -54,7 +54,7 @@ function LeaderboardView( { root } ) {
 		intervalMs = 15000;
 	}
 
-	const { data } = useLeaderboard( campaignId, query, {
+	const { data, loading } = useLeaderboard( campaignId, query, {
 		intervalMs,
 		initialData,
 	} );
@@ -70,7 +70,7 @@ function LeaderboardView( { root } ) {
 			currency={ currency }
 			showAmount={ showAmount }
 			showAvatar={ showAvatar }
-			loading={ false }
+			loading={ loading }
 		/>
 	);
 }
