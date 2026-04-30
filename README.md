@@ -34,7 +34,7 @@ Five custom post types, all `show_in_rest` and registered under the `giving-day/
 |-----------|-----------|---------|
 | **`giving_campaign`** | `campaigns` | The event itself: pre-event start, start/end, timezone, goal amount, currency, and linked WooCommerce donation products. One post per event run (recreated each year). |
 | **`giving_team`** | `teams` | *Who* is raising — a group of fundraisers. Long-lived; references one or more campaigns via `_giving_team_campaigns`, has a captain user, optional team goal. |
-| **`giving_beneficiary`** | `beneficiaries` | *What* gets funded — the destination of a donation (e.g. "Center for Planetary Studies"). Long-lived; references one or more campaigns via `_giving_beneficiary_campaigns`, carries an optional goal and parent-org label. |
+| **`giving_beneficiary`** | `beneficiaries` | *What* gets funded — the destination of a donation. Surfaced in the admin as **"Beneficiary / Fund"** so the same screen reads naturally for both audiences (universities call them *funds*; community foundations call them *beneficiaries* / *partner nonprofits*). **Hierarchical**: nest funds under a parent unit (e.g. *College of Arts & Sciences → Dean's Excellence Fund*) to roll up per-unit totals, or keep flat top-level posts and use the optional `_giving_beneficiary_parent_org` string as a display fallback. Long-lived; references one or more campaigns via `_giving_beneficiary_campaigns`. |
 | **`giving_match`** | `matches` | Sponsor match tied to a single campaign: multiplier, cap amount, active window, sponsor label. One-off per event. |
 | **`giving_challenge`** | `challenges` | Reusable, time-boxed mini-event: type (`donation_count` / `amount_raised` / `team`), threshold, reward, and a *relative* window (e.g. `PT0H–PT1H`) resolved per campaign. |
 
@@ -46,8 +46,8 @@ Two hierarchical taxonomies, both `show_in_rest`:
 
 | Taxonomy | REST base | Attached to | Purpose |
 |----------|-----------|-------------|---------|
-| **`giving_cause`** | `causes` | `giving_beneficiary` | Powers the "Give to a cause" browsing flow. Top-level terms (e.g. *Science*, *Arts & Humanities*) contain sub-causes (e.g. *Astronomy*, *Music*). A beneficiary can be tagged with multiple terms. |
-| **`giving_team_category`** | `team-categories` | `giving_team` | Powers tabbed/faceted leaderboards. Top-level terms are grouping dimensions (e.g. *Class Year*, *Athletic*, *Department*); child terms are the buckets (e.g. *2014*, *Rowing*, *Engineering*). A team can carry multiple tags across dimensions. |
+| **`giving_cause`** | `causes` | `giving_beneficiary` | Powers the "Give to a cause" browsing flow. Top-level terms (e.g. *Science*, *Arts & Humanities*) contain sub-causes (e.g. *Astronomy*, *Music*). A beneficiary / fund can be tagged with multiple terms. |
+| **`giving_team_group`** | `team-groups` | `giving_team` | Powers tabbed/faceted leaderboards. Top-level terms are grouping dimensions (e.g. *Class Year*, *Athletic*, *Department*); child terms are the buckets (e.g. *2014*, *Rowing*, *Engineering*). A team can carry multiple tags across dimensions. |
 
 Both taxonomies are hierarchical, non-public, admin-visible (`show_admin_column => true`), and their terms are intentionally long-lived — they persist across every Giving Day.
 
@@ -188,6 +188,8 @@ Shared hooks (`useCountdown`, `useLiveRefresh`) have their own unit tests under 
 
 The data model is best understood through a concrete scenario. Imagine **Awesome University** is running its annual Giving Day. Here's what each record looks like, and how they connect.
 
+> The same model works for **community-foundation Giving Days** (where each Beneficiary is an external partner nonprofit instead of an internal university fund). Where the two shapes diverge — chiefly in how Beneficiaries are organized — both are shown side-by-side below.
+
 ### How the pieces connect
 
 ```mermaid
@@ -205,7 +207,7 @@ flowchart TB
 
     subgraph Taxonomies["Hierarchical taxonomies"]
         CAUSE["<b>giving_cause</b><br/>Science → Astronomy"]
-        TCAT["<b>giving_team_category</b><br/>Class Year → 2014"]
+        TGRP["<b>giving_team_group</b><br/>Class Year → 2014"]
     end
 
     ORDER[("WC Order<br/>$100 donation")]
@@ -216,7 +218,7 @@ flowchart TB
     CHAL  -.->|_giving_challenge_campaigns array| CAMP
 
     BEN  -->|tagged with| CAUSE
-    TEAM -->|tagged with| TCAT
+    TEAM -->|tagged with| TGRP
 
     ORDER -->|_giving_campaign_id| CAMP
     ORDER -->|_giving_team_id| TEAM
@@ -263,37 +265,66 @@ Terms are permanent — they persist across every Giving Day.
 
 ### 3. `giving_beneficiary` — *what* gets funded
 
-The destination of a donation. Long-lived; participates in many campaigns.
+The destination of a donation. Long-lived; participates in many campaigns. The
+admin label is **"Beneficiary / Fund"** so the same screen reads naturally
+whether you're a university running internal funds or a community foundation
+listing partner nonprofits.
+
+The CPT is **hierarchical**, which lets the same model serve both shapes
+without a second post type.
+
+#### University example — nested funds with per-unit roll-up
 
 ```
-Title:    Center for Planetary Studies
-Post ID:  612
+Post 610 — "College of Arts & Sciences"   ← parent post (a "unit")
+  campaigns = [ 501, 502 ]
+  goal      = 1,000,000          # rolled-up totals are reported against this
+  causes    = [ Arts & Humanities ]
 
-Meta:
-  _giving_beneficiary_campaigns    = [ 501, 502 ]
-  _giving_beneficiary_goal_amount  = 250,000
-  _giving_beneficiary_parent_org   = "College of Arts & Sciences"
-
-Taxonomy (giving_cause):
-  - Science
-  - Astronomy
+  ├─ Post 611 — "Dean's Excellence Fund"
+  │    post_parent = 610
+  │    campaigns  = [ 501, 502 ]
+  │    goal       = 250,000
+  │    causes     = [ Arts & Humanities ]
+  │
+  ├─ Post 612 — "Center for Planetary Studies"
+  │    post_parent = 610
+  │    campaigns  = [ 501, 502 ]
+  │    goal       = 250,000
+  │    causes     = [ Science, Astronomy ]
+  │
+  └─ Post 614 — "University Concert Series"
+       post_parent = 610
+       campaigns  = [ 501 ]      # only 2026 this year
+       goal       = 50,000
+       causes     = [ Arts & Humanities, Music ]
 ```
 
-Two more, to make the pattern obvious:
+The Aggregator answers *"how much did the College of Arts & Sciences raise?"*
+by summing post 610 plus all of its descendants. Per-unit goals are real,
+single-CPT.
+
+#### Community-foundation example — flat list with `parent_org` fallback
+
+When there's no real hierarchy to model, beneficiaries are flat top-level
+posts. The free-form `_giving_beneficiary_parent_org` label provides an
+optional display string (e.g. coalition or umbrella name) without a parent
+post. {@see Beneficiary::display_unit_label()} resolves the right label for
+either shape — parent post title when set, otherwise this string.
 
 ```
-Post 613 — "Sustainable Agriculture Institute"
-  campaigns  = [ 501, 502 ]
-  parent_org = "College of Agriculture"
-  causes     = [ Science, Environmental ]
+Post 720 — "Local Food Bank"
+  campaigns  = [ 501 ]
+  parent_org = "Member of: Health Coalition of Travis County"
+  causes     = [ Community & Outreach ]
 
-Post 614 — "University Concert Series"
-  campaigns  = [ 501 ]                    # only 2026 this year
-  parent_org = "College of Arts & Sciences"
-  causes     = [ Arts & Humanities, Music ]
+Post 721 — "Animal Shelter"
+  campaigns  = [ 501 ]
+  parent_org = ""                 # no display label; flat top-level post
+  causes     = [ Community & Outreach ]
 ```
 
-### 4. `giving_team_category` — leaderboard tabs (taxonomy)
+### 4. `giving_team_group` — leaderboard tabs (taxonomy)
 
 Top-level terms are the tabs. Child terms are the buckets inside each tab.
 
@@ -326,7 +357,7 @@ Meta:
   _giving_captain_user_id  = 33
   _giving_team_goal_amount = 50,000
 
-Taxonomy (giving_team_category):
+Taxonomy (giving_team_group):
   - Class Year → 2014
   - Department → Arts & Sciences           # a Team can carry multiple tags
 ```
@@ -335,12 +366,12 @@ More examples:
 
 ```
 Post 702 — "Soccer Alumni"
-  campaigns = [ 501, 502 ]
-  team_category = [ Athletic → Soccer ]
+  campaigns  = [ 501, 502 ]
+  team_group = [ Athletic → Soccer ]
 
 Post 703 — "Engineering Faculty & Staff"
-  campaigns = [ 501 ]
-  team_category = [ Department → Engineering ]
+  campaigns  = [ 501 ]
+  team_group = [ Department → Engineering ]
 ```
 
 ### 6. `giving_match` — sponsor match (per campaign)
@@ -408,7 +439,7 @@ That single row feeds every block:
 | Top Teams leaderboard | Groups by `_giving_team_id` → +$100 for team 701 |
 | Top Beneficiaries | Groups by `_giving_beneficiary_id` → +$100 for 612 |
 | Top Causes | Joins beneficiary 612 → causes `[Science, Astronomy]` → +$100 to both |
-| "Class Year" tab sub-leaderboard | Joins team 701 → `giving_team_category` term "2014" → +$100 in the 2014 bucket |
+| "Class Year" tab sub-leaderboard | Joins team 701 → `giving_team_group` term "2014" → +$100 in the 2014 bucket |
 | Match 801 (Trustees' Power Hour) | Order time falls in `12:00–13:00` → 2× match credited |
 | Challenge 901 on Campaign 501 | Order time falls in `PT0H–PT1H` resolved window → counts toward 500-donation threshold |
 

@@ -6,7 +6,7 @@
 	"title": "Giving Day: Leaderboard",
 	"category": "widgets",
 	"icon": "awards",
-	"description": "Top donors, teams, beneficiaries, or causes for a campaign. Optional taxonomy filters and grouped team-category views.",
+	"description": "Top donors, teams, beneficiaries / funds, or causes for a campaign. Optional taxonomy filters and grouped team-group views.",
 	"keywords": [ "giving day", "leaderboard", "donors", "teams" ],
 	"textdomain": "giving-day-blocks",
 	"usesContext": [ "giving-day/parentCampaignId" ],

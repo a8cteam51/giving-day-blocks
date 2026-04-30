@@ -88,7 +88,7 @@ export default function Edit( { attributes, setAttributes, clientId } ) {
 		}
 		try {
 			const res = await apiFetch( {
-				path: '/giving-day/v1/team-categories?parent=0',
+				path: '/giving-day/v1/team-groups?parent=0',
 			} );
 			const terms = res?.terms || [];
 			if ( ! Array.isArray( terms ) || terms.length === 0 ) {
@@ -160,7 +160,7 @@ export default function Edit( { attributes, setAttributes, clientId } ) {
 						disabled={ ! campaignId }
 					>
 						{ __(
-							'Auto-populate from Team Categories',
+							'Auto-populate from Team Groups',
 							'giving-day-blocks'
 						) }
 					</Button>

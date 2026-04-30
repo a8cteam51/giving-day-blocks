@@ -24,7 +24,7 @@ use Team51\GivingDay\Data\MatchProgress;
 use Team51\GivingDay\Data\Status;
 use Team51\GivingDay\PostTypes\Campaign;
 use Team51\GivingDay\PostTypes\GivingMatch;
-use Team51\GivingDay\Taxonomies\TeamCategory;
+use Team51\GivingDay\Taxonomies\TeamGroup;
 use WP_Error;
 use WP_Post;
 use WP_REST_Request;
@@ -137,16 +137,16 @@ final class REST {
 					'minimum'     => 1,
 					'maximum'     => 100,
 				),
-				'filter_term_id' => array(
-					'description' => __( 'Optional team category or cause term ID to narrow results.', 'giving-day-blocks' ),
-					'type'        => 'integer',
-					'default'     => 0,
-				),
-				'group_by_parent_term_id' => array(
-					'description' => __( 'Optional parent team category term ID; returns one sub-list per child term.', 'giving-day-blocks' ),
-					'type'        => 'integer',
-					'default'     => 0,
-				),
+			'filter_term_id' => array(
+				'description' => __( 'Optional team group or cause term ID to narrow results.', 'giving-day-blocks' ),
+				'type'        => 'integer',
+				'default'     => 0,
+			),
+			'group_by_parent_term_id' => array(
+				'description' => __( 'Optional parent team group term ID; returns one sub-list per child term.', 'giving-day-blocks' ),
+				'type'        => 'integer',
+				'default'     => 0,
+			),
 				'anonymize' => array(
 					'description' => __( 'When true, donor names and avatars are redacted for top_donors.', 'giving-day-blocks' ),
 					'type'        => 'boolean',
@@ -168,7 +168,7 @@ final class REST {
 
 		register_rest_route(
 			self::NAMESPACE,
-			'/team-categories',
+			'/team-groups',
 			array(
 				'methods'             => WP_REST_Server::READABLE,
 				'permission_callback' => '__return_true',
@@ -179,7 +179,7 @@ final class REST {
 						'default'     => 0,
 					),
 				),
-				'callback'            => array( $this, 'get_team_categories' ),
+				'callback'            => array( $this, 'get_team_groups' ),
 			)
 		);
 	}
@@ -365,12 +365,12 @@ final class REST {
 	}
 
 	/**
-	 * GET /team-categories
+	 * GET /team-groups
 	 *
 	 * @param WP_REST_Request $request Request.
 	 * @return WP_REST_Response
 	 */
-	public function get_team_categories( WP_REST_Request $request ): WP_REST_Response {
+	public function get_team_groups( WP_REST_Request $request ): WP_REST_Response {
 		$parent = (int) $request->get_param( 'parent' );
 		if ( $parent < 0 ) {
 			$parent = 0;
@@ -378,7 +378,7 @@ final class REST {
 
 		$terms = get_terms(
 			array(
-				'taxonomy'   => TeamCategory::TAXONOMY,
+				'taxonomy'   => TeamGroup::TAXONOMY,
 				'parent'     => $parent,
 				'hide_empty' => false,
 				'orderby'    => 'name',
