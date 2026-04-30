@@ -1,0 +1,41 @@
+{
+	"$schema": "https://schemas.wp.org/trunk/block.json",
+	"apiVersion": 3,
+	"name": "giving-day/leaderboard-tabs",
+	"version": "0.1.0",
+	"title": "Giving Day: Leaderboard Tabs",
+	"category": "widgets",
+	"icon": "index-card",
+	"description": "Tabbed container for multiple Giving Day leaderboards (e.g. by team category).",
+	"keywords": [ "giving day", "leaderboard", "tabs" ],
+	"textdomain": "giving-day-blocks",
+	"providesContext": {
+		"giving-day/parentCampaignId": "campaignId"
+	},
+	"supports": {
+		"html": false,
+		"color": {
+			"background": true,
+			"text": true
+		},
+		"spacing": {
+			"margin": true,
+			"padding": true
+		},
+		"align": [ "wide", "full" ]
+	},
+	"attributes": {
+		"campaignId": {
+			"type": "number"
+		},
+		"defaultTabIndex": {
+			"type": "number",
+			"default": 0
+		}
+	},
+	"editorScript": "file:./index.js",
+	"viewScript": "file:./view.js",
+	"style": "file:./style-index.css",
+	"editorStyle": "file:./index.css",
+	"render": "file:./render.php"
+}
