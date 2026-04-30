@@ -9,6 +9,8 @@
 namespace Team51\GivingDay;
 
 use Team51\GivingDay\Admin\CampaignEditor;
+use Team51\GivingDay\Admin\Menu as AdminMenu;
+use Team51\GivingDay\Admin\ScreenIntro;
 use Team51\GivingDay\Admin\MatchEditor;
 use Team51\GivingDay\Data\Context;
 use Team51\GivingDay\Data\Leaderboard;
@@ -20,7 +22,7 @@ use Team51\GivingDay\PostTypes\GivingMatch;
 use Team51\GivingDay\PostTypes\Team;
 use Team51\GivingDay\Setup\MockData;
 use Team51\GivingDay\Taxonomies\Cause;
-use Team51\GivingDay\Taxonomies\TeamCategory;
+use Team51\GivingDay\Taxonomies\TeamGroup;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -75,11 +77,11 @@ final class Plugin {
 	public ?Cause $cause = null;
 
 	/**
-	 * The Team Category taxonomy component.
+	 * The Team Group taxonomy component.
 	 *
-	 * @var TeamCategory|null
+	 * @var TeamGroup|null
 	 */
-	public ?TeamCategory $team_category = null;
+	public ?TeamGroup $team_group = null;
 
 	/**
 	 * First-activation sample data seeder.
@@ -193,8 +195,8 @@ final class Plugin {
 		$this->cause = new Cause();
 		$this->cause->register();
 
-		$this->team_category = new TeamCategory();
-		$this->team_category->register();
+		$this->team_group = new TeamGroup();
+		$this->team_group->register();
 
 		$this->mock_data = new MockData();
 		$this->mock_data->register();
@@ -207,6 +209,10 @@ final class Plugin {
 
 		$this->campaign_editor = new CampaignEditor();
 		$this->campaign_editor->register();
+
+		( new AdminMenu() )->register();
+
+		( new ScreenIntro() )->register();
 
 		$this->match_editor = new MatchEditor();
 		$this->match_editor->register();

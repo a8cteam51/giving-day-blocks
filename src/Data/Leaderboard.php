@@ -13,7 +13,7 @@ use Team51\GivingDay\PostTypes\Beneficiary;
 use Team51\GivingDay\PostTypes\Campaign;
 use Team51\GivingDay\PostTypes\Team;
 use Team51\GivingDay\Taxonomies\Cause;
-use Team51\GivingDay\Taxonomies\TeamCategory;
+use Team51\GivingDay\Taxonomies\TeamGroup;
 use WC_Order;
 use WC_Order_Item_Product;
 
@@ -167,7 +167,7 @@ final class Leaderboard {
 	 * @return array<string, mixed>
 	 */
 	private static function fetch_grouped( int $campaign_id, string $dimension, int $limit, int $group_by_parent_id ): array {
-		$parent = get_term( $group_by_parent_id, TeamCategory::TAXONOMY );
+		$parent = get_term( $group_by_parent_id, TeamGroup::TAXONOMY );
 		if ( ! $parent instanceof \WP_Term || is_wp_error( $parent ) ) {
 			return array(
 				'campaign_id' => $campaign_id,
@@ -179,7 +179,7 @@ final class Leaderboard {
 
 		$children = get_terms(
 			array(
-				'taxonomy'   => TeamCategory::TAXONOMY,
+				'taxonomy'   => TeamGroup::TAXONOMY,
 				'parent'     => $group_by_parent_id,
 				'hide_empty' => false,
 				'orderby'    => 'name',
@@ -491,7 +491,19 @@ final class Leaderboard {
 	}
 
 	private static function team_has_term( int $team_id, int $term_id ): bool {
-		return has_term( $term_id, TeamCategory::TAXONOMY, $team_id );
+		$terms = get_the_terms( $team_id, TeamGroup::TAXONOMY );
+		if ( ! is_array( $terms ) ) {
+			return false;
+		}
+		foreach ( $terms as $term ) {
+			if ( ! $term instanceof \WP_Term ) {
+				continue;
+			}
+			if ( self::term_is_descendant_or_self( (int) $term->term_id, $term_id, TeamGroup::TAXONOMY ) ) {
+				return true;
+			}
+		}
+		return false;
 	}
 
 	private static function beneficiary_in_cause_subtree( int $beneficiary_id, int $cause_term_id ): bool {
@@ -511,7 +523,7 @@ final class Leaderboard {
 	}
 
 	/**
-	 * Drops mismatched taxonomy filters so a team-category ID is not applied to cause dimensions.
+	 * Drops mismatched taxonomy filters so a team-group ID is not applied to cause dimensions.
 	 *
 	 * @param string $dimension      One of DIMENSION_*.
 	 * @param int    $filter_term_id Raw filter from request.
@@ -522,7 +534,7 @@ final class Leaderboard {
 			return 0;
 		}
 		if ( self::DIMENSION_TEAMS === $dimension || self::DIMENSION_DONORS === $dimension ) {
-			$t = get_term( $filter_term_id, TeamCategory::TAXONOMY );
+			$t = get_term( $filter_term_id, TeamGroup::TAXONOMY );
 			if ( ! $t instanceof \WP_Term || is_wp_error( $t ) ) {
 				return 0;
 			}
@@ -541,11 +553,12 @@ final class Leaderboard {
 	/**
 	 * True when $term_id is $ancestor_id or a descendant of $ancestor_id.
 	 */
-	private static function term_is_descendant_or_self( int $term_id, int $ancestor_id ): bool {
+	private static function term_is_descendant_or_self( int $term_id, int $ancestor_id, ?string $taxonomy = null ): bool {
+		$taxonomy = $taxonomy ?? Cause::TAXONOMY;
 		if ( $term_id === $ancestor_id ) {
 			return true;
 		}
-		$anc = get_ancestors( $term_id, Cause::TAXONOMY );
+		$anc = get_ancestors( $term_id, $taxonomy );
 		return in_array( $ancestor_id, $anc, true );
 	}
 

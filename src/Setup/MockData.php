@@ -18,7 +18,7 @@ use Team51\GivingDay\PostTypes\Challenge;
 use Team51\GivingDay\PostTypes\GivingMatch;
 use Team51\GivingDay\PostTypes\Team;
 use Team51\GivingDay\Taxonomies\Cause;
-use Team51\GivingDay\Taxonomies\TeamCategory;
+use Team51\GivingDay\Taxonomies\TeamGroup;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -148,26 +148,26 @@ final class MockData {
 			return array();
 		}
 
-		$beneficiary_id = $this->create_beneficiary( $campaign_id, $terms['cause_child'] );
+		$beneficiary_ids = $this->create_beneficiaries( $campaign_id, $terms['cause_child'] );
 
 		$team_ids = array(
-			$this->create_team( 'Team Alpha', $campaign_id, $terms['team_cat_child'] ),
-			$this->create_team( 'Team Beta', $campaign_id, $terms['team_cat_child'] ),
+			$this->create_team( 'Team Alpha', $campaign_id, $terms['team_group_child'] ),
+			$this->create_team( 'Team Beta', $campaign_id, $terms['team_group_child'] ),
 		);
 		$team_ids = array_values( array_filter( $team_ids ) );
 
-		$match_id        = $this->create_match( $campaign_id, $event_start );
-		$donor_match_id  = $this->create_donor_unlock_match( $campaign_id, $event_start );
-		$challenge_id    = $this->create_challenge( $campaign_id );
+		$match_id       = $this->create_match( $campaign_id, $event_start );
+		$donor_match_id = $this->create_donor_unlock_match( $campaign_id, $event_start );
+		$challenge_id   = $this->create_challenge( $campaign_id );
 
 		return array(
-			'campaign'     => $campaign_id,
-			'beneficiary'  => $beneficiary_id,
-			'teams'        => $team_ids,
-			'match'        => $match_id,
-			'donor_match'  => $donor_match_id,
-			'challenge'    => $challenge_id,
-			'terms'        => $terms,
+			'campaign'      => $campaign_id,
+			'beneficiaries' => $beneficiary_ids,
+			'teams'         => $team_ids,
+			'match'         => $match_id,
+			'donor_match'   => $donor_match_id,
+			'challenge'     => $challenge_id,
+			'terms'         => $terms,
 		);
 	}
 
@@ -181,14 +181,14 @@ final class MockData {
 		$cause_parent = $this->ensure_term( __( 'Education', 'giving-day-blocks' ), Cause::TAXONOMY, 0 );
 		$cause_child  = $this->ensure_term( __( 'Scholarships', 'giving-day-blocks' ), Cause::TAXONOMY, $cause_parent );
 
-		$team_cat_parent = $this->ensure_term( __( 'Class Year', 'giving-day-blocks' ), TeamCategory::TAXONOMY, 0 );
-		$team_cat_child  = $this->ensure_term( __( 'Alumni', 'giving-day-blocks' ), TeamCategory::TAXONOMY, $team_cat_parent );
+		$team_group_parent = $this->ensure_term( __( 'Class Year', 'giving-day-blocks' ), TeamGroup::TAXONOMY, 0 );
+		$team_group_child  = $this->ensure_term( __( 'Alumni', 'giving-day-blocks' ), TeamGroup::TAXONOMY, $team_group_parent );
 
 		return array(
-			'cause_parent'    => $cause_parent,
-			'cause_child'     => $cause_child,
-			'team_cat_parent' => $team_cat_parent,
-			'team_cat_child'  => $team_cat_child,
+			'cause_parent'      => $cause_parent,
+			'cause_child'       => $cause_child,
+			'team_group_parent' => $team_group_parent,
+			'team_group_child'  => $team_group_child,
 		);
 	}
 
@@ -253,9 +253,9 @@ final class MockData {
 
 	/**
 	 * Creates a Team post attached to the Campaign and tagged with the
-	 * sample team-category term.
+	 * sample team-group term.
 	 */
-	private function create_team( string $title, int $campaign_id, int $team_cat_term_id ): int {
+	private function create_team( string $title, int $campaign_id, int $team_group_term_id ): int {
 		$post_id = wp_insert_post(
 			array(
 				'post_type'   => Team::POST_TYPE,
@@ -272,24 +272,88 @@ final class MockData {
 		update_post_meta( $post_id, Team::META_CAMPAIGN_IDS, array( $campaign_id ) );
 		update_post_meta( $post_id, Team::META_GOAL_AMOUNT, 5000 );
 
-		if ( $team_cat_term_id > 0 ) {
-			wp_set_object_terms( $post_id, array( $team_cat_term_id ), TeamCategory::TAXONOMY );
+		if ( $team_group_term_id > 0 ) {
+			wp_set_object_terms( $post_id, array( $team_group_term_id ), TeamGroup::TAXONOMY );
 		}
 
 		return (int) $post_id;
 	}
 
 	/**
-	 * Creates a Beneficiary post tied to the Campaign and tagged with the
-	 * sample cause term.
+	 * Creates a small set of sample Beneficiaries that demonstrate both
+	 * the *hierarchical* layout (a parent unit with child funds, used by
+	 * universities) and the *flat* layout (top-level posts using the
+	 * `_giving_beneficiary_parent_org` string fallback, used by community
+	 * foundations).
+	 *
+	 * @return array<string, int|array<int>> ['parent' => id, 'children' => [ids], 'flat' => id]
 	 */
-	private function create_beneficiary( int $campaign_id, int $cause_term_id ): int {
+	private function create_beneficiaries( int $campaign_id, int $cause_term_id ): array {
+		$parent_id = $this->insert_beneficiary(
+			array(
+				'title'      => __( 'Sample College', 'giving-day-blocks' ),
+				'excerpt'    => __( 'A parent unit. Donations to its child funds roll up to this total.', 'giving-day-blocks' ),
+				'campaign'   => $campaign_id,
+				'goal'       => 25000,
+				'cause_term' => $cause_term_id,
+			)
+		);
+
+		$children = array(
+			$this->insert_beneficiary(
+				array(
+					'title'      => __( 'Sample Scholarship Fund', 'giving-day-blocks' ),
+					'excerpt'    => __( 'A child fund nested under the parent unit.', 'giving-day-blocks' ),
+					'campaign'   => $campaign_id,
+					'goal'       => 10000,
+					'cause_term' => $cause_term_id,
+					'parent'     => $parent_id,
+				)
+			),
+			$this->insert_beneficiary(
+				array(
+					'title'      => __( 'Sample Research Fund', 'giving-day-blocks' ),
+					'excerpt'    => __( 'A second child fund — useful to demonstrate per-unit roll-up.', 'giving-day-blocks' ),
+					'campaign'   => $campaign_id,
+					'goal'       => 8000,
+					'cause_term' => $cause_term_id,
+					'parent'     => $parent_id,
+				)
+			),
+		);
+
+		$flat_id = $this->insert_beneficiary(
+			array(
+				'title'      => __( 'Sample Partner Nonprofit', 'giving-day-blocks' ),
+				'excerpt'    => __( 'A flat (top-level) Beneficiary using the parent_org string fallback instead of a parent post.', 'giving-day-blocks' ),
+				'campaign'   => $campaign_id,
+				'goal'       => 5000,
+				'cause_term' => $cause_term_id,
+				'parent_org' => __( 'Sample Coalition', 'giving-day-blocks' ),
+			)
+		);
+
+		return array(
+			'parent'   => $parent_id,
+			'children' => array_values( array_filter( $children ) ),
+			'flat'     => $flat_id,
+		);
+	}
+
+	/**
+	 * Internal: inserts one Beneficiary with the supplied options.
+	 *
+	 * @param array{title:string, excerpt?:string, campaign:int, goal?:int|float, cause_term?:int, parent?:int, parent_org?:string} $opts
+	 * @return int Inserted post ID, or 0 on failure.
+	 */
+	private function insert_beneficiary( array $opts ): int {
 		$post_id = wp_insert_post(
 			array(
 				'post_type'    => Beneficiary::POST_TYPE,
 				'post_status'  => 'publish',
-				'post_title'   => __( 'Sample Beneficiary Fund', 'giving-day-blocks' ),
-				'post_excerpt' => __( 'A generic sample destination for donations.', 'giving-day-blocks' ),
+				'post_title'   => $opts['title'],
+				'post_excerpt' => $opts['excerpt'] ?? '',
+				'post_parent'  => isset( $opts['parent'] ) ? (int) $opts['parent'] : 0,
 			),
 			true
 		);
@@ -298,12 +362,15 @@ final class MockData {
 			return 0;
 		}
 
-		update_post_meta( $post_id, Beneficiary::META_CAMPAIGN_IDS, array( $campaign_id ) );
-		update_post_meta( $post_id, Beneficiary::META_GOAL_AMOUNT, 10000 );
-		update_post_meta( $post_id, Beneficiary::META_PARENT_ORG, __( 'Sample Organization', 'giving-day-blocks' ) );
-
-		if ( $cause_term_id > 0 ) {
-			wp_set_object_terms( $post_id, array( $cause_term_id ), Cause::TAXONOMY );
+		update_post_meta( $post_id, Beneficiary::META_CAMPAIGN_IDS, array( (int) $opts['campaign'] ) );
+		if ( isset( $opts['goal'] ) ) {
+			update_post_meta( $post_id, Beneficiary::META_GOAL_AMOUNT, $opts['goal'] );
+		}
+		if ( ! empty( $opts['parent_org'] ) ) {
+			update_post_meta( $post_id, Beneficiary::META_PARENT_ORG, $opts['parent_org'] );
+		}
+		if ( ! empty( $opts['cause_term'] ) ) {
+			wp_set_object_terms( $post_id, array( (int) $opts['cause_term'] ), Cause::TAXONOMY );
 		}
 
 		return (int) $post_id;

@@ -6,7 +6,7 @@
 	"title": "Giving Day: Leaderboard Tabs",
 	"category": "widgets",
 	"icon": "index-card",
-	"description": "Tabbed container for multiple Giving Day leaderboards (e.g. by team category).",
+	"description": "Tabbed container for multiple Giving Day leaderboards (e.g. by team group).",
 	"keywords": [ "giving day", "leaderboard", "tabs" ],
 	"textdomain": "giving-day-blocks",
 	"providesContext": {

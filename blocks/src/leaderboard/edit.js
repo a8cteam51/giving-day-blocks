@@ -22,7 +22,7 @@ const DIMENSIONS = [
 	{ label: __( 'Top donors', 'giving-day-blocks' ), value: 'top_donors' },
 	{ label: __( 'Top teams', 'giving-day-blocks' ), value: 'top_teams' },
 	{
-		label: __( 'Top beneficiaries', 'giving-day-blocks' ),
+		label: __( 'Top beneficiaries / funds', 'giving-day-blocks' ),
 		value: 'top_beneficiaries',
 	},
 	{ label: __( 'Top causes', 'giving-day-blocks' ), value: 'top_causes' },
@@ -167,7 +167,7 @@ export default function Edit( { attributes, setAttributes, context } ) {
 					/>
 					<TextControl
 						label={ __(
-							'Filter term ID (team category or cause)',
+							'Filter term ID (team group or cause)',
 							'giving-day-blocks'
 						) }
 						type="number"
@@ -178,7 +178,7 @@ export default function Edit( { attributes, setAttributes, context } ) {
 							} )
 						}
 						help={ __(
-							'Optional. Narrows teams or beneficiaries to one taxonomy term.',
+							'Optional. Narrows teams or beneficiaries / funds to one taxonomy term.',
 							'giving-day-blocks'
 						) }
 						__next40pxDefaultSize
@@ -186,7 +186,7 @@ export default function Edit( { attributes, setAttributes, context } ) {
 					/>
 					<TextControl
 						label={ __(
-							'Group by parent team category (term ID)',
+							'Group by parent team group (term ID)',
 							'giving-day-blocks'
 						) }
 						type="number"
