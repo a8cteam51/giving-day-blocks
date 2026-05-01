@@ -12,6 +12,7 @@
  * @package Team51\GivingDay\Blocks
  */
 
+use Team51\GivingDay\Data\Aggregator;
 use Team51\GivingDay\Data\Colors;
 use Team51\GivingDay\Data\Context;
 use Team51\GivingDay\Data\Status;
@@ -50,11 +51,11 @@ $live_headline  = isset($attributes['liveHeadline']) ? (string) $attributes['liv
 $ended_headline = isset($attributes['endedHeadline']) ? (string) $attributes['endedHeadline'] : '';
 $show_donors    = ! empty($attributes['showDonorCount']);
 
-$goal          = (float) get_post_meta($campaign_id, Campaign::META_GOAL_AMOUNT, true);
-$raised        = (float) get_post_meta($campaign_id, Campaign::META_RAISED_OVERRIDE, true);
-$donors        = (int) get_post_meta($campaign_id, Campaign::META_DONOR_COUNT_OVERRIDE, true);
-$currency_meta = get_post_meta($campaign_id, Campaign::META_CURRENCY, true);
-$currency      = (string) ( '' !== $currency_meta ? $currency_meta : get_option('woocommerce_currency', 'USD') );
+$goal     = (float) get_post_meta($campaign_id, Campaign::META_GOAL_AMOUNT, true);
+$totals   = Aggregator::totals_for_campaign($campaign_id);
+$raised   = isset($totals['raised']) ? (float) $totals['raised'] : 0.0;
+$donors   = isset($totals['unique_donors']) ? (int) $totals['unique_donors'] : 0;
+$currency = isset($totals['currency']) ? (string) $totals['currency'] : (string) get_option('woocommerce_currency', 'USD');
 
 $start = get_post_meta($campaign_id, Campaign::META_START_DATETIME, true);
 $end   = get_post_meta($campaign_id, Campaign::META_END_DATETIME, true);

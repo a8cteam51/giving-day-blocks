@@ -13,8 +13,10 @@
  * so adding them later is a single new `case` in {@see resolve()} plus a
  * matching JS branch in blocks/src/_shared/utils/goalProgress.js.
  *
- * Until the WC order Aggregator (PLAN.md § 4.3) lands, "raised" and
- * "donor_count" come from the dev-override meta on the Campaign CPT.
+ * `raised` and `donor_count` come from {@see Aggregator::totals_for_campaign()},
+ * which sums donation line items off real WC orders and falls back to the
+ * Campaign's `META_RAISED_OVERRIDE` / `META_DONOR_COUNT_OVERRIDE` only when
+ * those overrides are set explicitly (PLAN.md § 4.3 + Phase 10).
  *
  * @package Team51\GivingDay\Data
  * @since   0.1.0
@@ -75,13 +77,12 @@ final class GoalProgress {
 			return null;
 		}
 
+		$totals = Aggregator::totals_for_campaign( $campaign_id );
+
 		$goal     = (float) get_post_meta( $campaign_id, Campaign::META_GOAL_AMOUNT, true );
-		$raised   = (float) get_post_meta( $campaign_id, Campaign::META_RAISED_OVERRIDE, true );
-		$donors   = (int) get_post_meta( $campaign_id, Campaign::META_DONOR_COUNT_OVERRIDE, true );
-		$currency = (string) get_post_meta( $campaign_id, Campaign::META_CURRENCY, true );
-		if ( '' === $currency ) {
-			$currency = (string) get_option( 'woocommerce_currency', 'USD' );
-		}
+		$raised   = isset( $totals['raised'] ) ? (float) $totals['raised'] : 0.0;
+		$donors   = isset( $totals['unique_donors'] ) ? (int) $totals['unique_donors'] : 0;
+		$currency = isset( $totals['currency'] ) ? (string) $totals['currency'] : (string) get_option( 'woocommerce_currency', 'USD' );
 
 		$percent_raw = $goal > 0 ? ( $raised / $goal ) * 100 : 0.0;
 		$percent     = max( 0.0, min( 100.0, $percent_raw ) );
