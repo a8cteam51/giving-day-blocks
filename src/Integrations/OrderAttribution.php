@@ -34,6 +34,7 @@ final class OrderAttribution {
 	 */
 	public function register(): void {
 		add_action( 'woocommerce_checkout_create_order', array( $this, 'tag_order' ), 20, 1 );
+		add_action( 'admin_notices', array( $this, 'maybe_render_overlap_notice' ) );
 	}
 
 	/**
@@ -98,6 +99,57 @@ final class OrderAttribution {
 	 * fixed via the Edit Order screen).
 	 */
 	public static function default_campaign_id(): int {
+		$live = self::live_campaigns_sorted();
+		if ( empty( $live ) ) {
+			return 0;
+		}
+
+		return $live[0]['id'];
+	}
+
+	/**
+	 * Renders an admin notice when more than one campaign is live, so
+	 * admins notice accidental overlap (orphan donations get attributed
+	 * to the most recently started one).
+	 */
+	public function maybe_render_overlap_notice(): void {
+		if ( ! current_user_can( 'edit_posts' ) ) {
+			return;
+		}
+
+		$live = self::live_campaigns_sorted();
+		if ( count( $live ) < 2 ) {
+			return;
+		}
+
+		$items = array();
+		foreach ( $live as $entry ) {
+			$title    = get_the_title( $entry['id'] );
+			$edit_url = get_edit_post_link( $entry['id'] );
+			$label    = '' !== $title ? $title : sprintf( '#%d', $entry['id'] );
+			$items[]  = $edit_url
+				? sprintf( '<a href="%s">%s</a>', esc_url( $edit_url ), esc_html( $label ) )
+				: esc_html( $label );
+		}
+
+		printf(
+			'<div class="notice notice-warning"><p><strong>%s</strong> %s</p><p>%s</p></div>',
+			esc_html__( 'Giving Day:', 'giving-day-blocks' ),
+			sprintf(
+				/* translators: %s: comma-separated list of live campaign links. */
+				esc_html__( 'More than one campaign is currently live: %s.', 'giving-day-blocks' ),
+				implode( ', ', $items ) // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- each item is escaped above.
+			),
+			esc_html__( 'Donations without explicit attribution will default to the campaign with the most recent start. If this overlap is unintentional, adjust the schedule on one of the campaigns.', 'giving-day-blocks' )
+		);
+	}
+
+	/**
+	 * Returns currently-live campaigns sorted by most recent start first.
+	 *
+	 * @return array<int, array{id: int, start: string}>
+	 */
+	private static function live_campaigns_sorted(): array {
 		$candidates = get_posts(
 			array(
 				'post_type'              => Campaign::POST_TYPE,
@@ -110,7 +162,7 @@ final class OrderAttribution {
 			)
 		);
 		if ( empty( $candidates ) ) {
-			return 0;
+			return array();
 		}
 
 		$live = array();
@@ -125,20 +177,15 @@ final class OrderAttribution {
 			);
 		}
 
-		if ( empty( $live ) ) {
-			return 0;
-		}
-		if ( 1 === count( $live ) ) {
-			return $live[0]['id'];
+		if ( count( $live ) > 1 ) {
+			usort(
+				$live,
+				static function ( array $a, array $b ): int {
+					return strcmp( $b['start'], $a['start'] );
+				}
+			);
 		}
 
-		usort(
-			$live,
-			static function ( array $a, array $b ): int {
-				return strcmp( $b['start'], $a['start'] );
-			}
-		);
-
-		return $live[0]['id'];
+		return $live;
 	}
 }

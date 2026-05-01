@@ -168,8 +168,24 @@ final class Context {
 	 * @param int|null $beneficiary_id Updated by reference.
 	 */
 	private static function normalize_query_attribution( int &$campaign_id, ?int &$team_id, ?int &$beneficiary_id ): void {
+		$team_campaigns = ( null !== $team_id && $team_id > 0 )
+			? self::campaign_ids_from_meta( $team_id, '_giving_team_campaigns' )
+			: array();
+		$ben_campaigns  = ( null !== $beneficiary_id && $beneficiary_id > 0 )
+			? self::campaign_ids_from_meta( $beneficiary_id, '_giving_beneficiary_campaigns' )
+			: array();
+
+		// When both sides are present without an explicit campaign, prefer
+		// a campaign shared by team and beneficiary so neither side gets
+		// dropped just because we picked the team's first campaign first.
+		if ( 0 === $campaign_id && ! empty( $team_campaigns ) && ! empty( $ben_campaigns ) ) {
+			$shared = array_values( array_intersect( $team_campaigns, $ben_campaigns ) );
+			if ( ! empty( $shared ) ) {
+				$campaign_id = $shared[0];
+			}
+		}
+
 		if ( null !== $team_id && $team_id > 0 ) {
-			$team_campaigns = self::campaign_ids_from_meta( $team_id, '_giving_team_campaigns' );
 			if ( empty( $team_campaigns ) ) {
 				$team_id = null;
 			} elseif ( $campaign_id > 0 ) {
@@ -182,7 +198,6 @@ final class Context {
 		}
 
 		if ( null !== $beneficiary_id && $beneficiary_id > 0 ) {
-			$ben_campaigns = self::campaign_ids_from_meta( $beneficiary_id, '_giving_beneficiary_campaigns' );
 			if ( empty( $ben_campaigns ) ) {
 				$beneficiary_id = null;
 			} elseif ( $campaign_id > 0 ) {
