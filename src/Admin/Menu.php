@@ -63,6 +63,7 @@ final class Menu {
 			'edit-tags.php?taxonomy=' . TeamGroup::TAXONOMY . '&post_type=' . Team::POST_TYPE,
 			'edit.php?post_type=' . GivingMatch::POST_TYPE,
 			'edit.php?post_type=' . Challenge::POST_TYPE,
+			SettingsPage::PAGE_SLUG,
 		);
 
 		$ordered = array();

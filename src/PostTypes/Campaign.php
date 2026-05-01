@@ -30,8 +30,6 @@ final class Campaign extends AbstractPostType {
 	public const META_CURRENCY           = '_giving_currency';
 	public const META_DONATION_PRODUCTS  = '_giving_donation_product_ids';
 	public const META_STATUS_OVERRIDE    = '_giving_status_override';
-	public const META_RAISED_OVERRIDE    = '_giving_raised_override';
-	public const META_DONOR_COUNT_OVERRIDE = '_giving_donor_count_override';
 	public const META_COLOR_PRIMARY      = '_giving_color_primary';
 	public const META_COLOR_SECONDARY    = '_giving_color_secondary';
 	public const META_COLOR_ACCENT       = '_giving_color_accent';
@@ -130,20 +128,6 @@ final class Campaign extends AbstractPostType {
 					$value = is_string( $value ) ? $value : '';
 					return in_array( $value, self::STATUSES, true ) ? $value : '';
 				},
-			),
-
-			// Temporary scaffolding: lets blocks render real "raised" / "donor count" values
-			// before the WC order Aggregator (PLAN.md § 4.3) is built. When the Aggregator
-			// lands, it will prefer real data and fall back to these overrides.
-			self::META_RAISED_OVERRIDE   => array(
-				'type'        => 'number',
-				'description' => __( 'Dev override for "raised so far". Null/0 until set. Removed once the WC order Aggregator is in place.', 'giving-day-blocks' ),
-				'default'     => 0,
-			),
-			self::META_DONOR_COUNT_OVERRIDE => array(
-				'type'        => 'integer',
-				'description' => __( 'Dev override for donor count. Removed once the WC order Aggregator is in place.', 'giving-day-blocks' ),
-				'default'     => 0,
 			),
 
 			// Per-campaign brand palette. Each key maps 1:1 to a CSS custom

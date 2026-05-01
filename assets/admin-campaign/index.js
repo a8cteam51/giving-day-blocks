@@ -325,41 +325,6 @@ function CampaignDetailsPanel() {
 				__next40pxDefaultSize
 				__nextHasNoMarginBottom
 			/>
-
-			<Notice status="info" isDismissible={ false }>
-				{ __(
-					'Dev overrides below simulate fundraising data until the order aggregator ships.',
-					'giving-day-blocks'
-				) }
-			</Notice>
-
-			<NumberControl
-				label={ __( 'Dev: raised override', 'giving-day-blocks' ) }
-				value={ meta?.[ META_KEYS.raisedOverride ] ?? 0 }
-				min={ 0 }
-				step={ 1 }
-				onChange={ ( value ) =>
-					updateMeta(
-						META_KEYS.raisedOverride,
-						value === '' ? 0 : Number( value )
-					)
-				}
-				__next40pxDefaultSize
-			/>
-
-			<NumberControl
-				label={ __( 'Dev: donor count override', 'giving-day-blocks' ) }
-				value={ meta?.[ META_KEYS.donorCountOverride ] ?? 0 }
-				min={ 0 }
-				step={ 1 }
-				onChange={ ( value ) =>
-					updateMeta(
-						META_KEYS.donorCountOverride,
-						value === '' ? 0 : parseInt( value, 10 )
-					)
-				}
-				__next40pxDefaultSize
-			/>
 		</PluginDocumentSettingPanel>
 	);
 }

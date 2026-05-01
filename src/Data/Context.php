@@ -140,13 +140,13 @@ final class Context {
 				$campaign_id = $queried->ID;
 			} elseif ( Team::POST_TYPE === $queried->post_type ) {
 				$team_id       = $queried->ID;
-				$team_campaign = (int) get_post_meta( $queried->ID, '_giving_team_campaigns', true );
+				$team_campaign = self::first_campaign_id_from_meta( $queried->ID, '_giving_team_campaigns' );
 				if ( $team_campaign > 0 && 0 === $campaign_id ) {
 					$campaign_id = $team_campaign;
 				}
 			} elseif ( Beneficiary::POST_TYPE === $queried->post_type ) {
 				$beneficiary_id = $queried->ID;
-				$ben_campaign   = (int) get_post_meta( $queried->ID, '_giving_beneficiary_campaigns', true );
+				$ben_campaign   = self::first_campaign_id_from_meta( $queried->ID, '_giving_beneficiary_campaigns' );
 				if ( $ben_campaign > 0 && 0 === $campaign_id ) {
 					$campaign_id = $ben_campaign;
 				}
@@ -169,22 +169,57 @@ final class Context {
 	 */
 	private static function normalize_query_attribution( int &$campaign_id, ?int &$team_id, ?int &$beneficiary_id ): void {
 		if ( null !== $team_id && $team_id > 0 ) {
-			$team_campaign = (int) get_post_meta( $team_id, '_giving_team_campaigns', true );
-			if ( $team_campaign <= 0 || ( $campaign_id > 0 && $campaign_id !== $team_campaign ) ) {
+			$team_campaigns = self::campaign_ids_from_meta( $team_id, '_giving_team_campaigns' );
+			if ( empty( $team_campaigns ) ) {
 				$team_id = null;
+			} elseif ( $campaign_id > 0 ) {
+				if ( ! in_array( $campaign_id, $team_campaigns, true ) ) {
+					$team_id = null;
+				}
 			} else {
-				$campaign_id = $team_campaign;
+				$campaign_id = $team_campaigns[0];
 			}
 		}
 
 		if ( null !== $beneficiary_id && $beneficiary_id > 0 ) {
-			$ben_campaign = (int) get_post_meta( $beneficiary_id, '_giving_beneficiary_campaigns', true );
-			if ( $ben_campaign <= 0 || ( $campaign_id > 0 && $campaign_id !== $ben_campaign ) ) {
+			$ben_campaigns = self::campaign_ids_from_meta( $beneficiary_id, '_giving_beneficiary_campaigns' );
+			if ( empty( $ben_campaigns ) ) {
 				$beneficiary_id = null;
+			} elseif ( $campaign_id > 0 ) {
+				if ( ! in_array( $campaign_id, $ben_campaigns, true ) ) {
+					$beneficiary_id = null;
+				}
 			} else {
-				$campaign_id = $ben_campaign;
+				$campaign_id = $ben_campaigns[0];
 			}
 		}
+	}
+
+	/**
+	 * Reads a `_giving_*_campaigns` meta value as a list of int IDs.
+	 * Tolerant of legacy scalar storage.
+	 *
+	 * @return array<int, int>
+	 */
+	private static function campaign_ids_from_meta( int $post_id, string $meta_key ): array {
+		$raw = get_post_meta( $post_id, $meta_key, true );
+		if ( is_array( $raw ) ) {
+			$ids = array_values( array_filter( array_map( 'intval', $raw ) ) );
+			return $ids;
+		}
+		if ( is_scalar( $raw ) && (int) $raw > 0 ) {
+			return array( (int) $raw );
+		}
+		return array();
+	}
+
+	/**
+	 * Convenience for callers that only need a single campaign ID
+	 * (Team / Beneficiary singles default to the first associated campaign).
+	 */
+	private static function first_campaign_id_from_meta( int $post_id, string $meta_key ): int {
+		$ids = self::campaign_ids_from_meta( $post_id, $meta_key );
+		return $ids[0] ?? 0;
 	}
 
 	/**

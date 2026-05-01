@@ -23,14 +23,6 @@
  *     hold the computed payload for `cache_ttl_seconds()` — 15s live, 5m
  *     scheduled, 24h ended (matching PLAN.md § 4.3).
  *
- * Override fallback (PLAN.md § 4.3): if a Campaign has a non-zero
- * `META_RAISED_OVERRIDE` or `META_DONOR_COUNT_OVERRIDE`, that override
- * replaces the corresponding computed value. The two overrides are
- * independent — one can be set without the other. PLAN.md Phase 10
- * re-purposes this knob from "replace" to "additive" (offline donations);
- * until then, "replace" preserves the demo behavior the blocks shipped
- * with before any real orders existed.
- *
  * @package Team51\GivingDay\Data
  * @since   0.1.0
  */
@@ -150,13 +142,8 @@ final class Aggregator {
 
 	/**
 	 * Computes campaign-wide totals: raised, donation count, average gift,
-	 * unique donors, currency.
-	 *
-	 * Override behavior (PLAN.md § 4.3, Phase 10): when a Campaign carries
-	 * a non-zero `META_RAISED_OVERRIDE` and/or `META_DONOR_COUNT_OVERRIDE`,
-	 * the override replaces the matching computed value. Each override is
-	 * applied independently. `count` and `avg` always reflect real orders
-	 * because they have no override field.
+	 * unique donors, currency. All values reflect real WC orders attributed
+	 * to the campaign and in a counting status.
 	 *
 	 * Shape:
 	 *   array{
@@ -182,17 +169,17 @@ final class Aggregator {
 			return $cached;
 		}
 
-		$raised_real  = 0.0;
-		$count_real   = 0;
-		$donor_keys   = array();
+		$raised     = 0.0;
+		$count      = 0;
+		$donor_keys = array();
 
 		foreach ( self::each_attributed_order( $campaign_id ) as $order ) {
 			$donation_total = self::donation_total_for_order( $order );
 			if ( $donation_total <= 0 ) {
 				continue;
 			}
-			$raised_real += $donation_total;
-			++$count_real;
+			$raised += $donation_total;
+			++$count;
 
 			$donor_key = self::donor_key_for_order( $order );
 			if ( null !== $donor_key ) {
@@ -200,23 +187,15 @@ final class Aggregator {
 			}
 		}
 
-		$donors_real = count( $donor_keys );
-
-		$raised_override = (float) get_post_meta( $campaign_id, Campaign::META_RAISED_OVERRIDE, true );
-		$donors_override = (int) get_post_meta( $campaign_id, Campaign::META_DONOR_COUNT_OVERRIDE, true );
-
-		$raised        = $raised_override > 0 ? $raised_override : $raised_real;
-		$unique_donors = $donors_override > 0 ? $donors_override : $donors_real;
-
 		$currency_meta = (string) get_post_meta( $campaign_id, Campaign::META_CURRENCY, true );
 		$currency      = '' !== $currency_meta ? $currency_meta : (string) get_option( 'woocommerce_currency', 'USD' );
 
 		$payload = array(
 			'campaign_id'   => $campaign_id,
 			'raised'        => round( $raised, 2 ),
-			'count'         => $count_real,
-			'avg'           => $count_real > 0 ? round( $raised_real / $count_real, 2 ) : 0.0,
-			'unique_donors' => $unique_donors,
+			'count'         => $count,
+			'avg'           => $count > 0 ? round( $raised / $count, 2 ) : 0.0,
+			'unique_donors' => count( $donor_keys ),
 			'currency'      => $currency,
 			'server_time'   => gmdate( 'c' ),
 		);
