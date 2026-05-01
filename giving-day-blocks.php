@@ -26,7 +26,7 @@
 
 defined( 'ABSPATH' ) || exit;
 
-define( 'GIVING_DAY_BLOCKS_VERSION', '0.1.0' );
+define( 'GIVING_DAY_BLOCKS_VERSION', '0.2.0' );
 define( 'GIVING_DAY_BLOCKS_BASENAME', plugin_basename( __FILE__ ) );
 define( 'GIVING_DAY_BLOCKS_PATH', plugin_dir_path( __FILE__ ) );
 define( 'GIVING_DAY_BLOCKS_URL', plugin_dir_url( __FILE__ ) );

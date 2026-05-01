@@ -238,7 +238,7 @@ final class REST {
 		$currency = isset( $totals['currency'] ) ? (string) $totals['currency'] : (string) get_option( 'woocommerce_currency', 'USD' );
 		$raised   = isset( $totals['raised'] ) ? (float) $totals['raised'] : 0.0;
 		$donors   = isset( $totals['unique_donors'] ) ? (int) $totals['unique_donors'] : 0;
-		$percent  = $goal > 0 ? min( 100, ( $raised / $goal ) * 100 ) : 0;
+		$percent  = $goal > 0 ? max( 0, min( 100, ( $raised / $goal ) * 100 ) ) : 0;
 
 		$payload = array(
 			'id'            => $campaign_id,
