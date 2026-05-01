@@ -12,8 +12,8 @@ use Team51\GivingDay\Admin\CampaignEditor;
 use Team51\GivingDay\Admin\Menu as AdminMenu;
 use Team51\GivingDay\Admin\MatchEditor;
 use Team51\GivingDay\Admin\ScreenIntro;
+use Team51\GivingDay\Data\Aggregator;
 use Team51\GivingDay\Data\Context;
-use Team51\GivingDay\Data\Leaderboard;
 use Team51\GivingDay\Frontend\SingleTemplates;
 use Team51\GivingDay\Integrations\OrderAttribution;
 use Team51\GivingDay\PostTypes\Beneficiary;
@@ -230,7 +230,7 @@ final class Plugin {
 		$this->order_attribution = new OrderAttribution();
 		$this->order_attribution->register();
 
-		Leaderboard::register_hooks();
+		Aggregator::register_hooks();
 
 		add_action( 'init', array( $this, 'maybe_flush_rewrite_rules' ), 1000 );
 	}

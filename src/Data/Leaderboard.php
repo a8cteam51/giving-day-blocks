@@ -9,18 +9,19 @@
 namespace Team51\GivingDay\Data;
 
 use Team51\GivingDay\Integrations\OrderAttribution;
-use Team51\GivingDay\PostTypes\Beneficiary;
 use Team51\GivingDay\PostTypes\Campaign;
-use Team51\GivingDay\PostTypes\Team;
 use Team51\GivingDay\Taxonomies\Cause;
 use Team51\GivingDay\Taxonomies\TeamGroup;
 use WC_Order;
-use WC_Order_Item_Product;
 
 defined( 'ABSPATH' ) || exit;
 
 /**
  * Computes leaderboards for a campaign with transient caching.
+ *
+ * The shared WC order iteration / donation-line-item / donor-key /
+ * cache-version logic lives on {@see Aggregator}; this class only
+ * decides how to bucket and rank.
  */
 final class Leaderboard {
 
@@ -38,50 +39,6 @@ final class Leaderboard {
 		self::DIMENSION_BENEFICIARIES,
 		self::DIMENSION_CAUSES,
 	);
-
-	/**
-	 * Registers cache invalidation hooks.
-	 */
-	public static function register_hooks(): void {
-		add_action( 'woocommerce_order_status_changed', array( self::class, 'on_order_status_changed' ), 20, 3 );
-	}
-
-	/**
-	 * Bumps invalidation version when a tagged order transitions to a state that
-	 * affects aggregates.
-	 *
-	 * @param int    $order_id    Order ID.
-	 * @param string $status_from Previous status.
-	 * @param string $status_to   New status.
-	 */
-	public static function on_order_status_changed( int $order_id, string $status_from, string $status_to ): void {
-		unset( $status_from );
-		$order = wc_get_order( $order_id );
-		if ( ! $order instanceof WC_Order ) {
-			return;
-		}
-		if ( ! in_array( $status_to, array( 'processing', 'completed', 'refunded', 'cancelled', 'failed' ), true ) ) {
-			return;
-		}
-		$campaign_id = (int) $order->get_meta( OrderAttribution::META_CAMPAIGN_ID );
-		if ( $campaign_id > 0 ) {
-			self::invalidate( $campaign_id );
-		}
-	}
-
-	/**
-	 * Bumps cache version for a campaign so all leaderboard transients miss.
-	 *
-	 * @param int $campaign_id Campaign post ID.
-	 */
-	public static function invalidate( int $campaign_id ): void {
-		if ( $campaign_id <= 0 ) {
-			return;
-		}
-		$key = 'giving_day_lb_ver_' . $campaign_id;
-		$ver = (int) get_option( $key, 0 );
-		update_option( $key, $ver + 1, false );
-	}
 
 	/**
 	 * Returns leaderboard payload (flat rows or grouped).
@@ -104,7 +61,7 @@ final class Leaderboard {
 		$filter_term_id       = isset( $args['filter_term_id'] ) ? absint( $args['filter_term_id'] ) : 0;
 		$group_by_parent_id   = isset( $args['group_by_parent_term_id'] ) ? absint( $args['group_by_parent_term_id'] ) : 0;
 
-		$ver = (int) get_option( 'giving_day_lb_ver_' . $campaign_id, 0 );
+		$ver = Aggregator::cache_version( $campaign_id );
 		$key = sprintf(
 			'gd_lb_%d_%s_%d_%d_%d_%d',
 			$ver,
@@ -120,7 +77,7 @@ final class Leaderboard {
 			return $cached;
 		}
 
-		$ttl = self::cache_ttl_seconds( $campaign_id, $preview_override );
+		$ttl = Aggregator::cache_ttl_seconds( $campaign_id, $preview_override );
 
 		if ( $group_by_parent_id > 0 ) {
 			$payload = self::fetch_grouped( $campaign_id, $dimension, $limit, $group_by_parent_id );
@@ -140,22 +97,6 @@ final class Leaderboard {
 		set_transient( $key, $payload, $ttl );
 
 		return $payload;
-	}
-
-	/**
-	 * @param int         $campaign_id      Campaign ID.
-	 * @param string|null $preview_override Optional preview status for logged-in REST callers.
-	 * @return int TTL in seconds.
-	 */
-	private static function cache_ttl_seconds( int $campaign_id, ?string $preview_override = null ): int {
-		$status = Status::resolve( $campaign_id, $preview_override );
-		if ( Status::LIVE === $status ) {
-			return 15;
-		}
-		if ( Status::ENDED === $status ) {
-			return DAY_IN_SECONDS;
-		}
-		return 5 * MINUTE_IN_SECONDS;
 	}
 
 	/**
@@ -220,8 +161,8 @@ final class Leaderboard {
 		$filter_term_id = self::normalize_filter_term_id( $dimension, $filter_term_id );
 		$buckets         = array();
 
-		foreach ( self::each_attributed_order( $campaign_id ) as $order ) {
-			$donation_total = self::donation_total_for_order( $order );
+		foreach ( Aggregator::each_attributed_order( $campaign_id ) as $order ) {
+			$donation_total = Aggregator::donation_total_for_order( $order );
 			if ( $donation_total <= 0 ) {
 				continue;
 			}
@@ -320,16 +261,11 @@ final class Leaderboard {
 	 * @param float $donation_total Amount to add.
 	 */
 	private static function accumulate_donor( WC_Order $order, array &$buckets, float $donation_total ): void {
-		$user_id = (int) $order->get_user_id();
-		if ( $user_id > 0 ) {
-			$key = 'u:' . $user_id;
-		} else {
-			$email = strtolower( trim( (string) $order->get_billing_email() ) );
-			if ( '' === $email ) {
-				return;
-			}
-			$key = 'e:' . md5( $email );
+		$key = Aggregator::donor_key_for_order( $order );
+		if ( null === $key ) {
+			return;
 		}
+		$user_id = (int) $order->get_user_id();
 		if ( ! isset( $buckets[ $key ] ) ) {
 			$buckets[ $key ] = array(
 				'id'     => $user_id > 0 ? $user_id : 0,
@@ -408,86 +344,6 @@ final class Leaderboard {
 		}
 		unset( $row );
 		return $rows;
-	}
-
-	/**
-	 * @param int $campaign_id Campaign ID.
-	 * @return \Generator<int, WC_Order>
-	 */
-	private static function each_attributed_order( int $campaign_id ): \Generator {
-		if ( ! function_exists( 'wc_get_orders' ) ) {
-			return;
-		}
-
-		$args = array(
-			'limit'      => -1,
-			'return'     => 'ids',
-			'status'     => array( 'processing', 'completed' ),
-			'meta_key'   => OrderAttribution::META_CAMPAIGN_ID,
-			'meta_value' => (string) $campaign_id,
-			'orderby'    => 'date',
-			'order'      => 'DESC',
-		);
-
-		$start = self::campaign_order_date_start( $campaign_id );
-		$end   = self::campaign_order_date_end( $campaign_id );
-		if ( null !== $start && null !== $end ) {
-			$args['date_created'] = $start . '...' . $end;
-		}
-
-		$ids = wc_get_orders( $args );
-		if ( ! is_array( $ids ) ) {
-			return;
-		}
-
-		foreach ( $ids as $order_id ) {
-			$order = wc_get_order( $order_id );
-			if ( $order instanceof WC_Order ) {
-				yield $order;
-			}
-		}
-	}
-
-	private static function campaign_order_date_start( int $campaign_id ): ?string {
-		$raw = (string) get_post_meta( $campaign_id, Campaign::META_START_DATETIME, true );
-		if ( '' === $raw ) {
-			return null;
-		}
-		$ts = strtotime( $raw );
-		return false === $ts ? null : (string) $ts;
-	}
-
-	private static function campaign_order_date_end( int $campaign_id ): ?string {
-		$raw = (string) get_post_meta( $campaign_id, Campaign::META_END_DATETIME, true );
-		if ( '' === $raw ) {
-			return null;
-		}
-		$ts = strtotime( $raw );
-		return false === $ts ? null : (string) $ts;
-	}
-
-	private static function donation_total_for_order( WC_Order $order ): float {
-		$total = 0.0;
-		foreach ( $order->get_items( 'line_item' ) as $item ) {
-			if ( ! $item instanceof WC_Order_Item_Product ) {
-				continue;
-			}
-			$has_donation_flag = metadata_exists( 'order_item', $item->get_id(), '_wpcomsp_donation' );
-			$default_donation  = $has_donation_flag ? (bool) $item->get_meta( '_wpcomsp_donation' ) : true;
-			/**
-			 * Filters whether a line item counts as a donation for Giving Day aggregates.
-			 *
-			 * @param bool                    $is_donation Default from `_wpcomsp_donation` when set; otherwise true (PLAN.md § 4.2.3).
-			 * @param WC_Order_Item_Product $item        Line item.
-			 * @param WC_Order               $order       Order.
-			 */
-			$is_donation = (bool) apply_filters( 'giving_day_is_donation_line_item', $default_donation, $item, $order );
-			if ( ! $is_donation ) {
-				continue;
-			}
-			$total += (float) $item->get_total();
-		}
-		return $total;
 	}
 
 	private static function team_has_term( int $team_id, int $term_id ): bool {

@@ -18,6 +18,7 @@
 
 namespace Team51\GivingDay;
 
+use Team51\GivingDay\Data\Aggregator;
 use Team51\GivingDay\Data\Colors;
 use Team51\GivingDay\Data\Leaderboard;
 use Team51\GivingDay\Data\MatchProgress;
@@ -232,12 +233,12 @@ final class REST {
 		$override = $this->preview_override_from_request( $request );
 		$status   = Status::resolve( $campaign_id, $override );
 
-		$goal       = (float) get_post_meta( $campaign_id, Campaign::META_GOAL_AMOUNT, true );
-		$currency_meta = get_post_meta( $campaign_id, Campaign::META_CURRENCY, true );
-		$currency      = (string) ( $currency_meta !== '' ? $currency_meta : get_option( 'woocommerce_currency', 'USD' ) );
-		$raised     = (float) get_post_meta( $campaign_id, Campaign::META_RAISED_OVERRIDE, true );
-		$donors     = (int) get_post_meta( $campaign_id, Campaign::META_DONOR_COUNT_OVERRIDE, true );
-		$percent    = $goal > 0 ? min( 100, ( $raised / $goal ) * 100 ) : 0;
+		$goal     = (float) get_post_meta( $campaign_id, Campaign::META_GOAL_AMOUNT, true );
+		$totals   = Aggregator::totals_for_campaign( $campaign_id, $override );
+		$currency = isset( $totals['currency'] ) ? (string) $totals['currency'] : (string) get_option( 'woocommerce_currency', 'USD' );
+		$raised   = isset( $totals['raised'] ) ? (float) $totals['raised'] : 0.0;
+		$donors   = isset( $totals['unique_donors'] ) ? (int) $totals['unique_donors'] : 0;
+		$percent  = $goal > 0 ? max( 0, min( 100, ( $raised / $goal ) * 100 ) ) : 0;
 
 		$payload = array(
 			'id'            => $campaign_id,
