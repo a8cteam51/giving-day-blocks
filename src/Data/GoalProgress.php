@@ -14,9 +14,7 @@
  * matching JS branch in blocks/src/_shared/utils/goalProgress.js.
  *
  * `raised` and `donor_count` come from {@see Aggregator::totals_for_campaign()},
- * which sums donation line items off real WC orders and falls back to the
- * Campaign's `META_RAISED_OVERRIDE` / `META_DONOR_COUNT_OVERRIDE` only when
- * those overrides are set explicitly (PLAN.md § 4.3 + Phase 10).
+ * which sums donation line items off real WC orders.
  *
  * @package Team51\GivingDay\Data
  * @since   0.1.0

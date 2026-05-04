@@ -72,8 +72,10 @@ function CountdownDigits( { label, remaining, hideDays = false } ) {
 function StateBody( { state, attributes, campaign } ) {
 	const meta = campaign?.meta || {};
 	const goal = Number( meta._giving_goal_amount || 0 );
-	const raised = Number( meta._giving_raised_override || 0 );
-	const donors = Number( meta._giving_donor_count_override || 0 );
+	// Editor preview only — real raised/donor numbers come from the
+	// server-side Aggregator at frontend render time.
+	const raised = 0;
+	const donors = 0;
 	const currency = meta._giving_currency || 'USD';
 
 	// Tick every second so the canvas countdown feels live, mirroring the

@@ -11,7 +11,9 @@ namespace Team51\GivingDay;
 use Team51\GivingDay\Admin\CampaignEditor;
 use Team51\GivingDay\Admin\Menu as AdminMenu;
 use Team51\GivingDay\Admin\MatchEditor;
+use Team51\GivingDay\Admin\OrderAttributionBox;
 use Team51\GivingDay\Admin\ScreenIntro;
+use Team51\GivingDay\Admin\SettingsPage;
 use Team51\GivingDay\Data\Aggregator;
 use Team51\GivingDay\Data\Context;
 use Team51\GivingDay\Frontend\SingleTemplates;
@@ -218,6 +220,10 @@ final class Plugin {
 		$this->campaign_editor = new CampaignEditor();
 		$this->campaign_editor->register();
 
+		( new SettingsPage() )->register();
+
+		( new OrderAttributionBox() )->register();
+
 		( new AdminMenu() )->register();
 
 		( new ScreenIntro() )->register();
@@ -233,6 +239,7 @@ final class Plugin {
 		Aggregator::register_hooks();
 
 		add_action( 'init', array( $this, 'maybe_flush_rewrite_rules' ), 1000 );
+		add_action( 'init', array( $this, 'maybe_purge_legacy_overrides' ), 1001 );
 	}
 
 	/**
@@ -247,5 +254,42 @@ final class Plugin {
 		}
 		flush_rewrite_rules( false );
 		update_option( 'giving_day_blocks_rewrite_version', self::REWRITE_RULES_VERSION, true );
+	}
+
+	/**
+	 * One-shot cleanup: deletes the legacy `_giving_raised_override` and
+	 * `_giving_donor_count_override` campaign meta (which used to replace
+	 * the Aggregator's computed totals — see commit removing them) and
+	 * bumps each campaign's cache version so transients keyed under the
+	 * old version can't return stale override-substituted payloads.
+	 *
+	 * Idempotent via the `giving_day_blocks_overrides_purged_v1` option.
+	 */
+	public function maybe_purge_legacy_overrides(): void {
+		if ( get_option( 'giving_day_blocks_overrides_purged_v1' ) ) {
+			return;
+		}
+
+		delete_post_meta_by_key( '_giving_raised_override' );
+		delete_post_meta_by_key( '_giving_donor_count_override' );
+
+		$campaign_ids = get_posts(
+			array(
+				'post_type'              => Campaign::POST_TYPE,
+				'post_status'            => 'any',
+				'posts_per_page'         => -1,
+				'fields'                 => 'ids',
+				'no_found_rows'          => true,
+				'update_post_meta_cache' => false,
+				'update_post_term_cache' => false,
+			)
+		);
+		if ( is_array( $campaign_ids ) ) {
+			foreach ( $campaign_ids as $cid ) {
+				Aggregator::invalidate( (int) $cid );
+			}
+		}
+
+		update_option( 'giving_day_blocks_overrides_purged_v1', 1, false );
 	}
 }

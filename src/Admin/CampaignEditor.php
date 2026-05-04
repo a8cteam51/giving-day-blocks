@@ -79,8 +79,6 @@ final class CampaignEditor {
 					'currency'            => Campaign::META_CURRENCY,
 					'donationProducts'    => Campaign::META_DONATION_PRODUCTS,
 					'statusOverride'      => Campaign::META_STATUS_OVERRIDE,
-					'raisedOverride'      => Campaign::META_RAISED_OVERRIDE,
-					'donorCountOverride'  => Campaign::META_DONOR_COUNT_OVERRIDE,
 					'colorPrimary'        => Campaign::META_COLOR_PRIMARY,
 					'colorSecondary'      => Campaign::META_COLOR_SECONDARY,
 					'colorAccent'         => Campaign::META_COLOR_ACCENT,
