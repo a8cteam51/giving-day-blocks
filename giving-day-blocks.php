@@ -5,7 +5,7 @@
  * @since       0.1.0
  * @version     0.2.1
  * @author      Team51 Special Projects
- * @license     GPL-3.0-or-later
+ * @license     GPL-2.0-or-later
  *
  * @wordpress-plugin
  * Plugin Name:             Giving Day Blocks
@@ -16,8 +16,8 @@
  * Requires PHP:            8.1
  * Author:                  Team51 Special Projects
  * Author URI:              https://wpspecialprojects.wordpress.com
- * License:                 GPL v3 or later
- * License URI:             https://www.gnu.org/licenses/gpl-3.0.html
+ * License:                 GPLv2 or later
+ * License URI:             https://www.gnu.org/licenses/gpl-2.0.html
  * Text Domain:             giving-day-blocks
  * Domain Path:             /languages
  * Requires Plugins:
