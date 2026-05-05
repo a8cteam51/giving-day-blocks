@@ -289,12 +289,11 @@ final class OfflineDonations {
 			return null;
 		}
 		$normalized = str_replace( 'T', ' ', $raw );
-		$timestamp  = strtotime( $normalized );
-		if ( false === $timestamp ) {
+		try {
+			$datetime = new WC_DateTime( $normalized, wp_timezone() );
+		} catch ( \Exception $e ) {
 			return null;
 		}
-		$datetime = new WC_DateTime( '@' . $timestamp, new \DateTimeZone( 'UTC' ) );
-		$datetime->setTimezone( wp_timezone() );
 		return $datetime;
 	}
 }

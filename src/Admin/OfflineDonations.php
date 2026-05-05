@@ -543,7 +543,7 @@ final class OfflineDonations {
 
 			$query = array(
 				'action'           => 'new',
-				'giving_day_error' => rawurlencode( $result->get_error_message() ),
+				'giving_day_error' => $result->get_error_message(),
 				'giving_day_draft' => 1,
 			);
 			// Pass the campaign through so the form prefills the select and
@@ -633,7 +633,7 @@ final class OfflineDonations {
 				array(
 					'action'           => 'new',
 					'campaign_id'      => $campaign_id,
-					'giving_day_error' => rawurlencode( $result->get_error_message() ),
+					'giving_day_error' => $result->get_error_message(),
 				),
 				$base
 			);
