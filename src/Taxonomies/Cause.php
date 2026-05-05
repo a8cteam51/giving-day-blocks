@@ -25,12 +25,153 @@ final class Cause extends AbstractTaxonomy {
 	public const TAXONOMY  = 'giving_cause';
 	public const REST_BASE = 'causes';
 
+	/**
+	 * Term meta key for the Cause Area image (attachment ID).
+	 *
+	 * Surfaced as a card thumbnail in the front-end Cause Areas Browser block.
+	 * The internal "Cause" wording is kept on the taxonomy/slug; the
+	 * "Cause Area" wording lives on the front-end block UI only.
+	 */
+	public const META_IMAGE_ID = '_giving_cause_image_id';
+
 	public function get_taxonomy(): string {
 		return self::TAXONOMY;
 	}
 
 	public function get_object_types(): array {
 		return array( Beneficiary::POST_TYPE );
+	}
+
+	/**
+	 * Hooks taxonomy and term-meta registration.
+	 */
+	public function register(): void {
+		parent::register();
+		add_action( 'init', array( $this, 'register_term_meta' ) );
+	}
+
+	/**
+	 * Registers the Cause Area image term meta with REST exposure.
+	 */
+	public function register_term_meta(): void {
+		register_term_meta(
+			self::TAXONOMY,
+			self::META_IMAGE_ID,
+			array(
+				'type'              => 'integer',
+				'description'       => __( 'Attachment ID for the Cause Area image displayed in the Cause Areas Browser block.', 'giving-day-blocks' ),
+				'single'            => true,
+				'default'           => 0,
+				'show_in_rest'      => true,
+				'sanitize_callback' => 'absint',
+				'auth_callback'     => static function () {
+					return current_user_can( 'manage_categories' );
+				},
+			)
+		);
+	}
+
+	/**
+	 * Returns the attachment ID associated with a Cause term, or 0.
+	 *
+	 * @param int $term_id Cause term ID.
+	 */
+	public static function get_image_id( int $term_id ): int {
+		if ( $term_id <= 0 ) {
+			return 0;
+		}
+		return (int) get_term_meta( $term_id, self::META_IMAGE_ID, true );
+	}
+
+	/**
+	 * Returns a URL to the Cause term's image at the given size, or '' when none.
+	 *
+	 * @param int    $term_id Cause term ID.
+	 * @param string $size    Image size keyword.
+	 */
+	public static function get_image_url( int $term_id, string $size = 'medium' ): string {
+		$attachment_id = self::get_image_id( $term_id );
+		if ( $attachment_id <= 0 ) {
+			return '';
+		}
+		$url = wp_get_attachment_image_url( $attachment_id, $size );
+		return is_string( $url ) ? $url : '';
+	}
+
+	/**
+	 * Counts published Beneficiaries tagged with the term.
+	 *
+	 * The term object's own `count` field reflects only direct tagging, so we
+	 * pre-expand descendant term IDs ourselves and delegate to
+	 * {@see self::count_beneficiaries_in_terms()} for the single tax_query.
+	 *
+	 * @param int  $term_id          Cause term ID.
+	 * @param bool $include_children Whether to roll up descendant terms.
+	 */
+	public static function count_beneficiaries( int $term_id, bool $include_children = true ): int {
+		if ( $term_id <= 0 ) {
+			return 0;
+		}
+
+		$term_ids = array( $term_id );
+		if ( $include_children ) {
+			$descendants = get_terms(
+				array(
+					'taxonomy'   => self::TAXONOMY,
+					'child_of'   => $term_id,
+					'fields'     => 'ids',
+					'hide_empty' => false,
+				)
+			);
+			if ( is_array( $descendants ) ) {
+				foreach ( $descendants as $descendant_id ) {
+					$term_ids[] = (int) $descendant_id;
+				}
+			}
+		}
+
+		return self::count_beneficiaries_in_terms( $term_ids );
+	}
+
+	/**
+	 * Batch-friendly variant: counts Beneficiaries across a pre-computed list
+	 * of term IDs in a single query.
+	 *
+	 * Callers that already know the descendant tree (e.g. the REST list
+	 * endpoint that prefetches the whole hierarchy in one `get_terms()` call)
+	 * use this directly to avoid the per-term `child_of` round-trip that
+	 * {@see self::count_beneficiaries()} would otherwise perform.
+	 *
+	 * @param int[] $term_ids Term IDs to include in the count.
+	 */
+	public static function count_beneficiaries_in_terms( array $term_ids ): int {
+		$term_ids = array_values( array_unique( array_map( 'intval', $term_ids ) ) );
+		$term_ids = array_filter( $term_ids, static fn( $id ) => $id > 0 );
+		if ( empty( $term_ids ) ) {
+			return 0;
+		}
+
+		$query = new \WP_Query(
+			array(
+				'post_type'              => Beneficiary::POST_TYPE,
+				'post_status'            => 'publish',
+				'posts_per_page'         => 1,
+				'fields'                 => 'ids',
+				'no_found_rows'          => false,
+				'update_post_meta_cache' => false,
+				'update_post_term_cache' => false,
+				'tax_query'              => array( // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_tax_query -- a single tax query is required to count posts; we pre-expanded descendants to avoid WP re-expanding them.
+					array(
+						'taxonomy'         => self::TAXONOMY,
+						'field'            => 'term_id',
+						'terms'            => array_values( $term_ids ),
+						'include_children' => false,
+					),
+				),
+			)
+		);
+
+		return (int) $query->found_posts;
 	}
 
 	protected function get_taxonomy_args(): array {

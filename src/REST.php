@@ -23,8 +23,10 @@ use Team51\GivingDay\Data\Colors;
 use Team51\GivingDay\Data\Leaderboard;
 use Team51\GivingDay\Data\MatchProgress;
 use Team51\GivingDay\Data\Status;
+use Team51\GivingDay\PostTypes\Beneficiary;
 use Team51\GivingDay\PostTypes\Campaign;
 use Team51\GivingDay\PostTypes\GivingMatch;
+use Team51\GivingDay\Taxonomies\Cause;
 use Team51\GivingDay\Taxonomies\TeamGroup;
 use WP_Error;
 use WP_Post;
@@ -206,6 +208,57 @@ final class REST {
 				'permission_callback' => array( $this, 'check_campaign_edit_and_products' ),
 				'args'                => array( 'id' => $args['id'] ),
 				'callback'            => array( $this, 'create_campaign_donation_product' ),
+			)
+		);
+
+		register_rest_route(
+			self::NAMESPACE,
+			'/cause-areas',
+			array(
+				'methods'             => WP_REST_Server::READABLE,
+				'permission_callback' => '__return_true',
+				'args'                => array(
+					'parent' => array(
+						'description'       => __( 'Parent term ID; 0 returns top-level Cause Areas.', 'giving-day-blocks' ),
+						'type'              => 'integer',
+						'default'           => 0,
+						'minimum'           => 0,
+						'sanitize_callback' => 'absint',
+					),
+				),
+				'callback'            => array( $this, 'get_cause_areas' ),
+			)
+		);
+
+		register_rest_route(
+			self::NAMESPACE,
+			'/cause-areas/beneficiaries',
+			array(
+				'methods'             => WP_REST_Server::READABLE,
+				'permission_callback' => '__return_true',
+				'args'                => array(
+					'cause_id' => array(
+						'description'       => __( 'Cause Area term ID; 0 means search across all Beneficiaries.', 'giving-day-blocks' ),
+						'type'              => 'integer',
+						'default'           => 0,
+						'minimum'           => 0,
+						'sanitize_callback' => 'absint',
+					),
+					'search'   => array(
+						'description'       => __( 'Optional free-text query (matches title and excerpt).', 'giving-day-blocks' ),
+						'type'              => 'string',
+						'default'           => '',
+						'sanitize_callback' => 'sanitize_text_field',
+					),
+					'per_page' => array(
+						'description' => __( 'Maximum number of Beneficiaries to return (1–100).', 'giving-day-blocks' ),
+						'type'        => 'integer',
+						'default'     => 50,
+						'minimum'     => 1,
+						'maximum'     => 100,
+					),
+				),
+				'callback'            => array( $this, 'get_cause_area_beneficiaries' ),
 			)
 		);
 	}
@@ -538,6 +591,174 @@ final class REST {
 	}
 
 	/**
+	 * GET /cause-areas
+	 *
+	 * Returns the children of `parent` (default 0 = top-level Cause Areas)
+	 * with the per-card data the front-end Cause Areas Browser needs:
+	 * image URL, descendant flag, and a beneficiary count that includes
+	 * descendants so non-leaf cards still feel populated.
+	 *
+	 * @param WP_REST_Request $request Request.
+	 * @return WP_REST_Response
+	 */
+	public function get_cause_areas( WP_REST_Request $request ) {
+		$parent = (int) $request->get_param( 'parent' );
+		if ( $parent < 0 ) {
+			$parent = 0;
+		}
+
+		// Single fetch of the entire Cause hierarchy. Walking the parent map
+		// in PHP avoids per-term `get_terms()` calls (one for child detection,
+		// one for descendant enumeration inside count_beneficiaries) that
+		// previously made this an O(N) endpoint as the taxonomy grew.
+		$all_terms = get_terms(
+			array(
+				'taxonomy'   => Cause::TAXONOMY,
+				'hide_empty' => false,
+				'orderby'    => 'name',
+				'order'      => 'ASC',
+			)
+		);
+		if ( ! is_array( $all_terms ) ) {
+			$all_terms = array();
+		}
+
+		$by_parent = array();
+		foreach ( $all_terms as $t ) {
+			if ( ! $t instanceof \WP_Term ) {
+				continue;
+			}
+			$by_parent[ (int) $t->parent ][] = (int) $t->term_id;
+		}
+
+		$items = array();
+		foreach ( $all_terms as $term ) {
+			if ( ! $term instanceof \WP_Term || (int) $term->parent !== $parent ) {
+				continue;
+			}
+
+			$term_id        = (int) $term->term_id;
+			$descendant_ids = self::collect_descendant_term_ids( $term_id, $by_parent );
+			$has_children   = ! empty( $by_parent[ $term_id ] );
+
+			$items[] = array(
+				'id'                => $term_id,
+				'name'              => self::decode_text( $term->name ),
+				'slug'              => $term->slug,
+				'description'       => self::decode_text( $term->description ),
+				'parent'            => (int) $term->parent,
+				'image_url'         => Cause::get_image_url( $term_id ),
+				'has_children'      => $has_children,
+				'beneficiary_count' => Cause::count_beneficiaries_in_terms(
+					array_merge( array( $term_id ), $descendant_ids )
+				),
+			);
+		}
+
+		return $this->respond(
+			array(
+				'parent'      => $parent,
+				'terms'       => $items,
+				'server_time' => gmdate( 'c' ),
+			)
+		);
+	}
+
+	/**
+	 * Walks a parent → child-IDs map to collect every descendant of a term.
+	 *
+	 * @param int                $term_id   Term whose descendants to collect.
+	 * @param array<int,int[]>   $by_parent Parent term ID → list of child term IDs.
+	 * @return int[]
+	 */
+	private static function collect_descendant_term_ids( int $term_id, array $by_parent ): array {
+		if ( empty( $by_parent[ $term_id ] ) ) {
+			return array();
+		}
+		$out = array();
+		foreach ( $by_parent[ $term_id ] as $child_id ) {
+			$out[] = (int) $child_id;
+			$out   = array_merge( $out, self::collect_descendant_term_ids( (int) $child_id, $by_parent ) );
+		}
+		return $out;
+	}
+
+	/**
+	 * GET /cause-areas/beneficiaries
+	 *
+	 * Returns Beneficiary cards for the front-end browser. With cause_id=0
+	 * and a search term, returns a global match across all Beneficiaries
+	 * (used for the root-level search shortcut). With cause_id>0, results
+	 * are scoped to that term and its descendants.
+	 *
+	 * @param WP_REST_Request $request Request.
+	 * @return WP_REST_Response
+	 */
+	public function get_cause_area_beneficiaries( WP_REST_Request $request ) {
+		$cause_id = (int) $request->get_param( 'cause_id' );
+		$search   = trim( (string) $request->get_param( 'search' ) );
+		$per_page = (int) $request->get_param( 'per_page' );
+		if ( $per_page <= 0 ) {
+			$per_page = 50;
+		}
+
+		$query_args = array(
+			'post_type'              => Beneficiary::POST_TYPE,
+			'post_status'            => 'publish',
+			'posts_per_page'         => $per_page,
+			'orderby'                => 'title',
+			'order'                  => 'ASC',
+			'no_found_rows'          => true,
+			'update_post_meta_cache' => false,
+			'update_post_term_cache' => false,
+		);
+
+		if ( $cause_id > 0 ) {
+			$query_args['tax_query'] = array( // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_tax_query -- the browser block is term-scoped by design.
+				array(
+					'taxonomy'         => Cause::TAXONOMY,
+					'field'            => 'term_id',
+					'terms'            => array( $cause_id ),
+					'include_children' => true,
+				),
+			);
+		}
+
+		if ( '' !== $search ) {
+			$query_args['s'] = $search;
+		}
+
+		$query = new \WP_Query( $query_args );
+		$items = array();
+
+		foreach ( $query->posts as $post ) {
+			if ( ! $post instanceof WP_Post ) {
+				continue;
+			}
+			$thumb_id = (int) get_post_thumbnail_id( $post->ID );
+			$thumb    = $thumb_id > 0 ? wp_get_attachment_image_url( $thumb_id, 'medium' ) : '';
+
+			$items[] = array(
+				'id'               => (int) $post->ID,
+				'title'            => self::decode_text( get_the_title( $post ) ),
+				'excerpt'          => self::decode_text( wp_strip_all_tags( (string) get_the_excerpt( $post ) ) ),
+				'permalink'        => (string) get_permalink( $post ),
+				'thumbnail_url'    => is_string( $thumb ) ? $thumb : '',
+				'parent_org_label' => self::decode_text( Beneficiary::display_unit_label( (int) $post->ID ) ),
+			);
+		}
+
+		return $this->respond(
+			array(
+				'cause_id'    => $cause_id,
+				'search'      => $search,
+				'items'       => $items,
+				'server_time' => gmdate( 'c' ),
+			)
+		);
+	}
+
+	/**
 	 * Loads a campaign the current caller is allowed to read.
 	 *
 	 * Returns the post when it exists, is a Campaign, and is either
@@ -597,6 +818,24 @@ final class REST {
 			'post' => Status::ENDED,
 		);
 		return $map[ $raw ] ?? null;
+	}
+
+	/**
+	 * Decodes HTML entities so REST clients receive raw text.
+	 *
+	 * WP runs term names and post titles through filters that emit
+	 * `&amp;` and `&#038;`. Those entities reach React via JSON and render
+	 * as literal text (JSX does not decode HTML entities), so we strip
+	 * them at the API boundary and let consumers re-encode for their
+	 * target context.
+	 *
+	 * @param string $value Possibly-encoded display value.
+	 */
+	private static function decode_text( string $value ): string {
+		if ( '' === $value ) {
+			return '';
+		}
+		return html_entity_decode( $value, ENT_QUOTES | ENT_HTML5, 'UTF-8' );
 	}
 
 	/**
