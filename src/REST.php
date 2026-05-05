@@ -607,45 +607,52 @@ final class REST {
 			$parent = 0;
 		}
 
-		$terms = get_terms(
+		// Single fetch of the entire Cause hierarchy. Walking the parent map
+		// in PHP avoids per-term `get_terms()` calls (one for child detection,
+		// one for descendant enumeration inside count_beneficiaries) that
+		// previously made this an O(N) endpoint as the taxonomy grew.
+		$all_terms = get_terms(
 			array(
 				'taxonomy'   => Cause::TAXONOMY,
-				'parent'     => $parent,
 				'hide_empty' => false,
 				'orderby'    => 'name',
 				'order'      => 'ASC',
 			)
 		);
+		if ( ! is_array( $all_terms ) ) {
+			$all_terms = array();
+		}
+
+		$by_parent = array();
+		foreach ( $all_terms as $t ) {
+			if ( ! $t instanceof \WP_Term ) {
+				continue;
+			}
+			$by_parent[ (int) $t->parent ][] = (int) $t->term_id;
+		}
 
 		$items = array();
-		if ( is_array( $terms ) ) {
-			foreach ( $terms as $term ) {
-				if ( ! $term instanceof \WP_Term ) {
-					continue;
-				}
-
-				$child_ids = get_terms(
-					array(
-						'taxonomy'   => Cause::TAXONOMY,
-						'parent'     => (int) $term->term_id,
-						'fields'     => 'ids',
-						'hide_empty' => false,
-						'number'     => 1,
-					)
-				);
-				$has_children = is_array( $child_ids ) && count( $child_ids ) > 0;
-
-				$items[] = array(
-					'id'                => (int) $term->term_id,
-					'name'              => self::decode_text( $term->name ),
-					'slug'              => $term->slug,
-					'description'       => self::decode_text( $term->description ),
-					'parent'            => (int) $term->parent,
-					'image_url'         => Cause::get_image_url( (int) $term->term_id ),
-					'has_children'      => $has_children,
-					'beneficiary_count' => Cause::count_beneficiaries( (int) $term->term_id, true ),
-				);
+		foreach ( $all_terms as $term ) {
+			if ( ! $term instanceof \WP_Term || (int) $term->parent !== $parent ) {
+				continue;
 			}
+
+			$term_id        = (int) $term->term_id;
+			$descendant_ids = self::collect_descendant_term_ids( $term_id, $by_parent );
+			$has_children   = ! empty( $by_parent[ $term_id ] );
+
+			$items[] = array(
+				'id'                => $term_id,
+				'name'              => self::decode_text( $term->name ),
+				'slug'              => $term->slug,
+				'description'       => self::decode_text( $term->description ),
+				'parent'            => (int) $term->parent,
+				'image_url'         => Cause::get_image_url( $term_id ),
+				'has_children'      => $has_children,
+				'beneficiary_count' => Cause::count_beneficiaries_in_terms(
+					array_merge( array( $term_id ), $descendant_ids )
+				),
+			);
 		}
 
 		return $this->respond(
@@ -655,6 +662,25 @@ final class REST {
 				'server_time' => gmdate( 'c' ),
 			)
 		);
+	}
+
+	/**
+	 * Walks a parent → child-IDs map to collect every descendant of a term.
+	 *
+	 * @param int                $term_id   Term whose descendants to collect.
+	 * @param array<int,int[]>   $by_parent Parent term ID → list of child term IDs.
+	 * @return int[]
+	 */
+	private static function collect_descendant_term_ids( int $term_id, array $by_parent ): array {
+		if ( empty( $by_parent[ $term_id ] ) ) {
+			return array();
+		}
+		$out = array();
+		foreach ( $by_parent[ $term_id ] as $child_id ) {
+			$out[] = (int) $child_id;
+			$out   = array_merge( $out, self::collect_descendant_term_ids( (int) $child_id, $by_parent ) );
+		}
+		return $out;
 	}
 
 	/**

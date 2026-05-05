@@ -164,6 +164,11 @@ function Breadcrumbs( { stack, rootLabel, onJump } ) {
 function App( { config } ) {
 	const labels = config.labels || {};
 	const showCounts = !! config.showCounts;
+	// Match the per-instance id emitted by render.php so SSR and hydrated
+	// markup keep label↔input pairing across the hydration boundary, and
+	// two blocks on one page don't collide on a shared id.
+	const searchInputId =
+		config.searchInputId || 'giving-day-cause-areas__search-input';
 
 	const [ stack, setStack ] = useState( [] );
 	const [ searchInput, setSearchInput ] = useState( '' );
@@ -281,13 +286,13 @@ function App( { config } ) {
 		<>
 			<div className="giving-day-cause-areas__search">
 				<label
-					htmlFor="giving-day-cause-areas__search-input"
+					htmlFor={ searchInputId }
 					className="screen-reader-text"
 				>
 					{ placeholder }
 				</label>
 				<input
-					id="giving-day-cause-areas__search-input"
+					id={ searchInputId }
 					className="giving-day-cause-areas__search-input"
 					type="search"
 					autoComplete="off"

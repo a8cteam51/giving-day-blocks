@@ -102,10 +102,8 @@ final class Cause extends AbstractTaxonomy {
 	 * Counts published Beneficiaries tagged with the term.
 	 *
 	 * The term object's own `count` field reflects only direct tagging, so we
-	 * pre-expand descendant term IDs ourselves and run a single tax_query with
-	 * `include_children => false`. This avoids WP_Query expanding the tree a
-	 * second time per term and keeps the cost predictable when the grid renders
-	 * many cards.
+	 * pre-expand descendant term IDs ourselves and delegate to
+	 * {@see self::count_beneficiaries_in_terms()} for the single tax_query.
 	 *
 	 * @param int  $term_id          Cause term ID.
 	 * @param bool $include_children Whether to roll up descendant terms.
@@ -132,6 +130,27 @@ final class Cause extends AbstractTaxonomy {
 			}
 		}
 
+		return self::count_beneficiaries_in_terms( $term_ids );
+	}
+
+	/**
+	 * Batch-friendly variant: counts Beneficiaries across a pre-computed list
+	 * of term IDs in a single query.
+	 *
+	 * Callers that already know the descendant tree (e.g. the REST list
+	 * endpoint that prefetches the whole hierarchy in one `get_terms()` call)
+	 * use this directly to avoid the per-term `child_of` round-trip that
+	 * {@see self::count_beneficiaries()} would otherwise perform.
+	 *
+	 * @param int[] $term_ids Term IDs to include in the count.
+	 */
+	public static function count_beneficiaries_in_terms( array $term_ids ): int {
+		$term_ids = array_values( array_unique( array_map( 'intval', $term_ids ) ) );
+		$term_ids = array_filter( $term_ids, static fn( $id ) => $id > 0 );
+		if ( empty( $term_ids ) ) {
+			return 0;
+		}
+
 		$query = new \WP_Query(
 			array(
 				'post_type'              => Beneficiary::POST_TYPE,
@@ -145,7 +164,7 @@ final class Cause extends AbstractTaxonomy {
 					array(
 						'taxonomy'         => self::TAXONOMY,
 						'field'            => 'term_id',
-						'terms'            => $term_ids,
+						'terms'            => array_values( $term_ids ),
 						'include_children' => false,
 					),
 				),

@@ -27,6 +27,12 @@ $search_placeholder = isset( $attributes['searchPlaceholder'] ) && '' !== $attri
 	? (string) $attributes['searchPlaceholder']
 	: __( 'Search beneficiaries', 'giving-day-blocks' );
 
+// Per-instance DOM id so two browser blocks on one page don't collide on
+// label/input pairing. Threaded through to the hydration config so the
+// React app reuses the same id after mount, avoiding a flash of mismatched
+// `for`/`id` attributes during SSR → hydration.
+$search_input_id = wp_unique_id( 'giving-day-cause-areas-search-' );
+
 $top_terms = get_terms(
 	array(
 		'taxonomy'   => Cause::TAXONOMY,
@@ -52,6 +58,7 @@ $config = array(
 	'columnsDesktop'        => $columns_desktop,
 	'showCounts'            => (bool) $show_counts,
 	'beneficiariesPostType' => Beneficiary::POST_TYPE,
+	'searchInputId'         => $search_input_id,
 	'labels'                => $labels,
 );
 
@@ -72,21 +79,28 @@ $wrapper_attrs = get_block_wrapper_attributes( $wrapper_extra );
 	<?php endif; ?>
 
 	<div class="giving-day-cause-areas__search" data-pre-hydrate="1">
-		<label for="giving-day-cause-areas__search-input" class="screen-reader-text">
+		<label for="<?php echo esc_attr( $search_input_id ); ?>" class="screen-reader-text">
 			<?php echo esc_html( $search_placeholder ); ?>
 		</label>
 		<input
 			type="search"
-			id="giving-day-cause-areas__search-input"
+			id="<?php echo esc_attr( $search_input_id ); ?>"
 			class="giving-day-cause-areas__search-input"
 			name="search"
 			placeholder="<?php echo esc_attr( $search_placeholder ); ?>"
 			autocomplete="off"
 			disabled
+			aria-disabled="true"
 		/>
 	</div>
 
-	<div class="giving-day-cause-areas__viewport" data-pre-hydrate="1">
+	<noscript>
+		<p class="giving-day-cause-areas__noscript">
+			<?php esc_html_e( 'Browsing Cause Areas requires JavaScript. Please enable it to filter and search.', 'giving-day-blocks' ); ?>
+		</p>
+	</noscript>
+
+	<div class="giving-day-cause-areas__viewport" data-pre-hydrate="1" aria-busy="true">
 		<div class="giving-day-cause-areas__grid" data-initial-view="causes">
 			<?php
 			if ( is_array( $top_terms ) && count( $top_terms ) > 0 ) :
@@ -102,6 +116,9 @@ $wrapper_attrs = get_block_wrapper_attributes( $wrapper_extra );
 						class="giving-day-cause-areas__card"
 						data-cause-id="<?php echo esc_attr( (string) $cause_term->term_id ); ?>"
 						data-cause-name="<?php echo esc_attr( html_entity_decode( $cause_term->name, ENT_QUOTES | ENT_HTML5, 'UTF-8' ) ); ?>"
+						disabled
+						aria-disabled="true"
+						tabindex="-1"
 					>
 						<span class="giving-day-cause-areas__card-image">
 							<?php if ( '' !== $image_url ) : ?>
