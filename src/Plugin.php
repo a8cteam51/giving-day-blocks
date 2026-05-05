@@ -11,12 +11,14 @@ namespace Team51\GivingDay;
 use Team51\GivingDay\Admin\CampaignEditor;
 use Team51\GivingDay\Admin\Menu as AdminMenu;
 use Team51\GivingDay\Admin\MatchEditor;
+use Team51\GivingDay\Admin\OfflineDonations as OfflineDonationsAdmin;
 use Team51\GivingDay\Admin\OrderAttributionBox;
 use Team51\GivingDay\Admin\ScreenIntro;
 use Team51\GivingDay\Admin\SettingsPage;
 use Team51\GivingDay\Data\Aggregator;
 use Team51\GivingDay\Data\Context;
 use Team51\GivingDay\Frontend\SingleTemplates;
+use Team51\GivingDay\Integrations\OfflineGateway;
 use Team51\GivingDay\Integrations\OrderAttribution;
 use Team51\GivingDay\PostTypes\Beneficiary;
 use Team51\GivingDay\PostTypes\Campaign;
@@ -235,6 +237,10 @@ final class Plugin {
 
 		$this->order_attribution = new OrderAttribution();
 		$this->order_attribution->register();
+
+		OfflineGateway::register();
+
+		( new OfflineDonationsAdmin() )->register();
 
 		Aggregator::register_hooks();
 

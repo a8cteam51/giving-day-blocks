@@ -31,6 +31,7 @@ namespace Team51\GivingDay\Data;
 
 use Team51\GivingDay\Integrations\OrderAttribution;
 use Team51\GivingDay\PostTypes\Campaign;
+use Team51\GivingDay\Services\OfflineDonations;
 use WC_Order;
 use WC_Order_Item_Product;
 
@@ -218,7 +219,7 @@ final class Aggregator {
 			return;
 		}
 
-		$args = array(
+		$base_args = array(
 			'limit'      => -1,
 			'return'     => 'ids',
 			'status'     => self::COUNTING_STATUSES,
@@ -228,16 +229,42 @@ final class Aggregator {
 			'order'      => 'DESC',
 		);
 
+		// In-window orders: date_created scoped to the campaign event window.
+		$args  = $base_args;
 		$start = self::campaign_order_date_boundary( $campaign_id, Campaign::META_START_DATETIME );
 		$end   = self::campaign_order_date_boundary( $campaign_id, Campaign::META_END_DATETIME );
 		if ( null !== $start && null !== $end ) {
 			$args['date_created'] = $start . '...' . $end;
 		}
+		$in_window_ids = wc_get_orders( $args );
+		$in_window_ids = is_array( $in_window_ids ) ? $in_window_ids : array();
 
-		$ids = wc_get_orders( $args );
-		if ( ! is_array( $ids ) ) {
-			return;
-		}
+		// Offline-flagged orders bypass the window: admins explicitly attribute
+		// them to the campaign, so a Saturday gala donation entered on Monday
+		// (or any backdated/late entry) still counts.
+		$offline_ids = wc_get_orders(
+			array(
+				'limit'      => -1,
+				'return'     => 'ids',
+				'status'     => self::COUNTING_STATUSES,
+				'orderby'    => 'date',
+				'order'      => 'DESC',
+				'meta_query' => array( // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_query
+					'relation' => 'AND',
+					array(
+						'key'   => OrderAttribution::META_CAMPAIGN_ID,
+						'value' => (string) $campaign_id,
+					),
+					array(
+						'key'   => OfflineDonations::META_OFFLINE_FLAG,
+						'value' => '1',
+					),
+				),
+			)
+		);
+		$offline_ids = is_array( $offline_ids ) ? $offline_ids : array();
+
+		$ids = array_values( array_unique( array_map( 'intval', array_merge( $in_window_ids, $offline_ids ) ) ) );
 
 		foreach ( $ids as $order_id ) {
 			$order = wc_get_order( $order_id );
