@@ -8,10 +8,11 @@ import { registerPlugin } from '@wordpress/plugins';
 import { PluginDocumentSettingPanel } from '@wordpress/editor';
 import { useSelect } from '@wordpress/data';
 import { useEntityProp } from '@wordpress/core-data';
+import { useCallback, useEffect, useRef, useState } from '@wordpress/element';
+import apiFetch from '@wordpress/api-fetch';
 import {
 	DateTimePicker,
 	SelectControl,
-	TextControl,
 	__experimentalNumberControl as NumberControl,
 	ColorIndicator,
 	ColorPicker,
@@ -19,8 +20,11 @@ import {
 	PanelRow,
 	Dropdown,
 	Button,
+	Spinner,
+	BaseControl,
+	FormTokenField,
 } from '@wordpress/components';
-import { __ } from '@wordpress/i18n';
+import { __, sprintf } from '@wordpress/i18n';
 
 const config = window.givingDayCampaignEditor || {};
 const META_KEYS = config.metaKeys || {};
@@ -174,6 +178,390 @@ function ColorField( { label, value, onChange, help } ) {
 	);
 }
 
+/**
+ * Returns a stable list of products by ID, in the order given.
+ * Caches lookups in component state so flipping the picker open/closed
+ * doesn't refetch existing values from the WC REST API.
+ */
+function useProductRecords( ids ) {
+	const [ records, setRecords ] = useState( {} );
+	const recordsRef = useRef( records );
+	recordsRef.current = records;
+
+	useEffect( () => {
+		const missing = ids.filter( ( id ) => ! recordsRef.current[ id ] );
+		if ( missing.length === 0 ) {
+			return;
+		}
+		let cancelled = false;
+		apiFetch( {
+			path: `/wc/v3/products?include=${ missing.join(
+				','
+			) }&per_page=${ missing.length }`,
+		} )
+			.then( ( results ) => {
+				if ( cancelled || ! Array.isArray( results ) ) {
+					return;
+				}
+				const next = { ...recordsRef.current };
+				results.forEach( ( p ) => {
+					next[ p.id ] = { id: p.id, name: p.name };
+				} );
+				setRecords( next );
+			} )
+			.catch( () => {
+				/* swallow — labels just stay as #ID */
+			} );
+		return () => {
+			cancelled = true;
+		};
+	}, [ ids ] );
+
+	return records;
+}
+
+/**
+ * WooCommerce product picker for the campaign's donation products. Replaces
+ * the legacy comma-separated ID input with a search-as-you-type token field
+ * plus a one-click "Create donation product" button so admins never have to
+ * leave the campaign editor to set up the underlying product.
+ */
+function DonationProductPicker( { value, onChange } ) {
+	const ids = ( value || [] ).map( ( id ) => parseInt( id, 10 ) ).filter( Boolean );
+	const records = useProductRecords( ids );
+
+	const [ search, setSearch ] = useState( '' );
+	const [ suggestions, setSuggestions ] = useState( [] );
+	const [ isCreating, setIsCreating ] = useState( false );
+	const [ message, setMessage ] = useState( null );
+	const searchRef = useRef( '' );
+
+	const campaignId = useSelect(
+		( select ) => select( 'core/editor' ).getCurrentPostId(),
+		[]
+	);
+
+	const debounceRef = useRef( null );
+	const handleInputChange = useCallback( ( input ) => {
+		setSearch( input );
+		searchRef.current = input;
+		if ( debounceRef.current ) {
+			clearTimeout( debounceRef.current );
+		}
+		debounceRef.current = setTimeout( () => {
+			if ( ! input || input.length < 2 ) {
+				setSuggestions( [] );
+				return;
+			}
+			apiFetch( {
+				path: `/wc/v3/products?search=${ encodeURIComponent(
+					input
+				) }&per_page=10&status=publish`,
+			} )
+				.then( ( results ) => {
+					if ( searchRef.current !== input ) {
+						return;
+					}
+					if ( ! Array.isArray( results ) ) {
+						setSuggestions( [] );
+						return;
+					}
+					setSuggestions(
+						results.map( ( p ) => ( { id: p.id, name: p.name } ) )
+					);
+				} )
+				.catch( () => setSuggestions( [] ) );
+		}, 300 );
+	}, [] );
+
+	useEffect(
+		() => () => {
+			if ( debounceRef.current ) {
+				clearTimeout( debounceRef.current );
+			}
+		},
+		[]
+	);
+
+	const tokens = ids.map( ( id ) => {
+		const record = records[ id ];
+		return record ? `${ record.name } (#${ id })` : `#${ id }`;
+	} );
+	const suggestionLabels = suggestions
+		.filter( ( s ) => ! ids.includes( s.id ) )
+		.map( ( s ) => `${ s.name } (#${ s.id })` );
+
+	const handleTokenChange = ( newTokens ) => {
+		// Map labels back to IDs. Suggestions are looked up first; if a token
+		// already corresponds to a known record use that; otherwise drop it.
+		const labelToId = new Map();
+		suggestions.forEach( ( s ) =>
+			labelToId.set( `${ s.name } (#${ s.id })`, s.id )
+		);
+		Object.values( records ).forEach( ( r ) =>
+			labelToId.set( `${ r.name } (#${ r.id })`, r.id )
+		);
+		ids.forEach( ( id ) => {
+			const r = records[ id ];
+			if ( r ) {
+				labelToId.set( `${ r.name } (#${ r.id })`, r.id );
+			} else {
+				labelToId.set( `#${ id }`, id );
+			}
+		} );
+		const nextIds = newTokens
+			.map( ( t ) => labelToId.get( t ) )
+			.filter( ( id ) => Number.isInteger( id ) && id > 0 );
+		onChange( nextIds );
+	};
+
+	const handleCreate = useCallback( () => {
+		if ( ! campaignId ) {
+			setMessage( {
+				status: 'error',
+				body: __(
+					'Save the campaign first so a product can be linked to it.',
+					'giving-day-blocks'
+				),
+			} );
+			return;
+		}
+		setIsCreating( true );
+		setMessage( null );
+		apiFetch( {
+			path: `/giving-day/v1/campaign/${ campaignId }/setup/donation-product`,
+			method: 'POST',
+		} )
+			.then( ( result ) => {
+				const newId = parseInt( result?.product_id, 10 );
+				if ( newId && ! ids.includes( newId ) ) {
+					onChange( [ ...ids, newId ] );
+				}
+				setMessage( {
+					status: 'success',
+					body: sprintf(
+						/* translators: %s: product name. */
+						__(
+							'Created and linked: %s',
+							'giving-day-blocks'
+						),
+						result?.product_name || `#${ newId }`
+					),
+				} );
+			} )
+			.catch( ( err ) => {
+				setMessage( {
+					status: 'error',
+					body:
+						err?.message ||
+						__(
+							'Could not create donation product.',
+							'giving-day-blocks'
+						),
+				} );
+			} )
+			.finally( () => setIsCreating( false ) );
+	}, [ campaignId, ids, onChange ] );
+
+	return (
+		<BaseControl
+			label={ __( 'Donation products', 'giving-day-blocks' ) }
+			help={ __(
+				'WooCommerce products that donors actually purchase. Type to search, or click the button below to auto-create one.',
+				'giving-day-blocks'
+			) }
+			__nextHasNoMarginBottom
+		>
+			<FormTokenField
+				value={ tokens }
+				suggestions={ suggestionLabels }
+				onInputChange={ handleInputChange }
+				onChange={ handleTokenChange }
+				placeholder={ __( 'Search products…', 'giving-day-blocks' ) }
+				__experimentalExpandOnFocus
+				__nextHasNoMarginBottom
+			/>
+			<div style={ { marginTop: 8 } }>
+				<Button
+					variant="secondary"
+					onClick={ handleCreate }
+					isBusy={ isCreating }
+					disabled={ isCreating || ! campaignId }
+				>
+					{ __( 'Create donation product', 'giving-day-blocks' ) }
+				</Button>
+				{ search && search.length === 1 && (
+					<p
+						style={ { fontSize: 12, color: '#555', marginTop: 4 } }
+					>
+						{ __(
+							'Type at least 2 characters to search.',
+							'giving-day-blocks'
+						) }
+					</p>
+				) }
+			</div>
+			{ message && (
+				<div style={ { marginTop: 8 } }>
+					<Notice
+						status={ message.status }
+						isDismissible
+						onRemove={ () => setMessage( null ) }
+					>
+						{ message.body }
+					</Notice>
+				</div>
+			) }
+		</BaseControl>
+	);
+}
+
+/**
+ * Sidebar checklist that surfaces the per-campaign prerequisites. Hits
+ * /giving-day/v1/campaign/{id}/setup once on mount and after meta saves
+ * so admins see at a glance what's left to configure.
+ */
+function CampaignSetupPanel() {
+	const { postType, postId, isSaving } = useSelect( ( select ) => {
+		const editor = select( 'core/editor' );
+		return {
+			postType: editor.getCurrentPostType(),
+			postId: editor.getCurrentPostId(),
+			isSaving: editor.isSavingPost() && ! editor.isAutosavingPost(),
+		};
+	}, [] );
+
+	const [ status, setStatus ] = useState( null );
+	const [ loading, setLoading ] = useState( false );
+	const wasSaving = useRef( false );
+
+	const fetchStatus = useCallback( () => {
+		if ( ! postId ) {
+			return;
+		}
+		setLoading( true );
+		apiFetch( {
+			path: `/giving-day/v1/campaign/${ postId }/setup`,
+		} )
+			.then( ( result ) => setStatus( result?.status || null ) )
+			.catch( () => setStatus( null ) )
+			.finally( () => setLoading( false ) );
+	}, [ postId ] );
+
+	useEffect( () => {
+		fetchStatus();
+	}, [ fetchStatus ] );
+
+	useEffect( () => {
+		if ( wasSaving.current && ! isSaving ) {
+			fetchStatus();
+		}
+		wasSaving.current = isSaving;
+	}, [ isSaving, fetchStatus ] );
+
+	if ( postType !== config.postType ) {
+		return null;
+	}
+
+	const items = [
+		{
+			key: 'startDatetime',
+			label: __( 'Event start date', 'giving-day-blocks' ),
+			missing: __(
+				'Set in "Campaign details" above.',
+				'giving-day-blocks'
+			),
+		},
+		{
+			key: 'endDatetime',
+			label: __( 'Event end date', 'giving-day-blocks' ),
+			missing: __(
+				'Set in "Campaign details" above.',
+				'giving-day-blocks'
+			),
+		},
+		{
+			key: 'goalAmount',
+			label: __( 'Goal amount', 'giving-day-blocks' ),
+			missing: __(
+				'Set a positive goal in "Campaign details".',
+				'giving-day-blocks'
+			),
+		},
+		{
+			key: 'donationProduct',
+			label: __( 'Donation product', 'giving-day-blocks' ),
+			missing: __(
+				'Pick or create a donation product above so checkout and offline donations work.',
+				'giving-day-blocks'
+			),
+		},
+	];
+
+	return (
+		<PluginDocumentSettingPanel
+			name="giving-day-campaign-setup"
+			title={ __( 'Setup status', 'giving-day-blocks' ) }
+			className="giving-day-campaign-setup"
+		>
+			{ loading && ! status && (
+				<PanelRow>
+					<Spinner />
+				</PanelRow>
+			) }
+			{ status &&
+				items.map( ( item ) => {
+					const ok = !! status[ item.key ]?.ok;
+					return (
+						<PanelRow key={ item.key }>
+							<div style={ { width: '100%' } }>
+								<div
+									style={ {
+										display: 'flex',
+										alignItems: 'center',
+										gap: 8,
+									} }
+								>
+									<span
+										aria-hidden="true"
+										style={ {
+											display: 'inline-block',
+											width: 18,
+											height: 18,
+											borderRadius: '50%',
+											background: ok
+												? '#1aab27'
+												: '#d63638',
+											color: '#fff',
+											fontSize: 12,
+											fontWeight: 700,
+											textAlign: 'center',
+											lineHeight: '18px',
+										} }
+									>
+										{ ok ? '✓' : '!' }
+									</span>
+									<strong>{ item.label }</strong>
+								</div>
+								{ ! ok && (
+									<p
+										style={ {
+											fontSize: 12,
+											color: '#555',
+											margin: '4px 0 0 26px',
+										} }
+									>
+										{ item.missing }
+									</p>
+								) }
+							</div>
+						</PanelRow>
+					);
+				} ) }
+		</PluginDocumentSettingPanel>
+	);
+}
+
 function CampaignDetailsPanel() {
 	const postType = useSelect(
 		( select ) => select( 'core/editor' ).getCurrentPostType(),
@@ -291,24 +679,11 @@ function CampaignDetailsPanel() {
 				</div>
 			</PanelRow>
 
-			<TextControl
-				label={ __( 'Donation product IDs', 'giving-day-blocks' ) }
-				help={ __(
-					'Comma-separated WooCommerce product IDs that feed this campaign.',
-					'giving-day-blocks'
-				) }
-				value={ ( meta?.[ META_KEYS.donationProducts ] || [] ).join(
-					', '
-				) }
-				onChange={ ( value ) => {
-					const ids = value
-						.split( ',' )
-						.map( ( v ) => parseInt( v.trim(), 10 ) )
-						.filter( ( n ) => Number.isInteger( n ) && n > 0 );
-					updateMeta( META_KEYS.donationProducts, ids );
-				} }
-				__next40pxDefaultSize
-				__nextHasNoMarginBottom
+			<DonationProductPicker
+				value={ meta?.[ META_KEYS.donationProducts ] || [] }
+				onChange={ ( ids ) =>
+					updateMeta( META_KEYS.donationProducts, ids )
+				}
 			/>
 
 			<SelectControl
@@ -427,6 +802,7 @@ function CampaignColorsPanel() {
 function CampaignSidebar() {
 	return (
 		<>
+			<CampaignSetupPanel />
 			<CampaignDetailsPanel />
 			<CampaignColorsPanel />
 		</>

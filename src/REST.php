@@ -186,6 +186,60 @@ final class REST {
 				'callback'            => array( $this, 'get_team_groups' ),
 			)
 		);
+
+		register_rest_route(
+			self::NAMESPACE,
+			'/campaign/(?P<id>\d+)/setup',
+			array(
+				'methods'             => WP_REST_Server::READABLE,
+				'permission_callback' => array( $this, 'check_campaign_edit' ),
+				'args'                => array( 'id' => $args['id'] ),
+				'callback'            => array( $this, 'get_campaign_setup' ),
+			)
+		);
+
+		register_rest_route(
+			self::NAMESPACE,
+			'/campaign/(?P<id>\d+)/setup/donation-product',
+			array(
+				'methods'             => WP_REST_Server::CREATABLE,
+				'permission_callback' => array( $this, 'check_campaign_edit_and_products' ),
+				'args'                => array( 'id' => $args['id'] ),
+				'callback'            => array( $this, 'create_campaign_donation_product' ),
+			)
+		);
+	}
+
+	/**
+	 * Permission callback: requires `edit_post` on the target campaign.
+	 *
+	 * @param WP_REST_Request $request
+	 * @return bool|WP_Error
+	 */
+	public function check_campaign_edit( WP_REST_Request $request ) {
+		$id = (int) $request['id'];
+		if ( ! current_user_can( 'edit_post', $id ) ) {
+			return new WP_Error( 'giving_day_forbidden', __( 'You cannot edit this campaign.', 'giving-day-blocks' ), array( 'status' => 403 ) );
+		}
+		return true;
+	}
+
+	/**
+	 * Permission callback: requires `edit_post` on the campaign AND
+	 * `edit_products` capability for creating donation products.
+	 *
+	 * @param WP_REST_Request $request
+	 * @return bool|WP_Error
+	 */
+	public function check_campaign_edit_and_products( WP_REST_Request $request ) {
+		$check = $this->check_campaign_edit( $request );
+		if ( true !== $check ) {
+			return $check;
+		}
+		if ( ! current_user_can( 'edit_products' ) ) {
+			return new WP_Error( 'giving_day_forbidden_products', __( 'You cannot create products.', 'giving-day-blocks' ), array( 'status' => 403 ) );
+		}
+		return true;
 	}
 
 	/**
@@ -419,6 +473,66 @@ final class REST {
 			array(
 				'terms'       => $out,
 				'server_time' => gmdate( 'c' ),
+			)
+		);
+	}
+
+	/**
+	 * GET /campaign/{id}/setup — readiness checklist for the editor UI.
+	 *
+	 * @param WP_REST_Request $request
+	 * @return WP_REST_Response|WP_Error
+	 */
+	public function get_campaign_setup( WP_REST_Request $request ) {
+		$campaign_id = (int) $request['id'];
+		if ( Campaign::POST_TYPE !== get_post_type( $campaign_id ) ) {
+			return new WP_Error(
+				'giving_day_blocks_campaign_not_found',
+				__( 'Campaign not found.', 'giving-day-blocks' ),
+				array( 'status' => 404 )
+			);
+		}
+
+		return $this->respond(
+			array(
+				'campaign_id' => $campaign_id,
+				'status'      => \Team51\GivingDay\Services\CampaignSetup::setup_status( $campaign_id ),
+				'server_time' => gmdate( 'c' ),
+			)
+		);
+	}
+
+	/**
+	 * POST /campaign/{id}/setup/donation-product — creates a donation
+	 * product and attaches it to the campaign. Returns the new product
+	 * info.
+	 *
+	 * @param WP_REST_Request $request
+	 * @return WP_REST_Response|WP_Error
+	 */
+	public function create_campaign_donation_product( WP_REST_Request $request ) {
+		$campaign_id = (int) $request['id'];
+		if ( Campaign::POST_TYPE !== get_post_type( $campaign_id ) ) {
+			return new WP_Error(
+				'giving_day_blocks_campaign_not_found',
+				__( 'Campaign not found.', 'giving-day-blocks' ),
+				array( 'status' => 404 )
+			);
+		}
+
+		$result = \Team51\GivingDay\Services\CampaignSetup::create_donation_product( $campaign_id );
+		if ( is_wp_error( $result ) ) {
+			$result->add_data( array( 'status' => 400 ) );
+			return $result;
+		}
+
+		$product = wc_get_product( $result );
+		return $this->respond(
+			array(
+				'product_id'   => (int) $result,
+				'product_name' => $product ? $product->get_name() : '',
+				'status'       => \Team51\GivingDay\Services\CampaignSetup::setup_status( $campaign_id ),
+				'server_time'  => gmdate( 'c' ),
 			)
 		);
 	}
