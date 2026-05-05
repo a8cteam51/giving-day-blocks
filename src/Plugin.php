@@ -9,6 +9,7 @@
 namespace Team51\GivingDay;
 
 use Team51\GivingDay\Admin\CampaignEditor;
+use Team51\GivingDay\Admin\CauseTermMeta;
 use Team51\GivingDay\Admin\Menu as AdminMenu;
 use Team51\GivingDay\Admin\MatchEditor;
 use Team51\GivingDay\Admin\OfflineDonations as OfflineDonationsAdmin;
@@ -241,6 +242,8 @@ final class Plugin {
 		OfflineGateway::register();
 
 		( new OfflineDonationsAdmin() )->register();
+
+		( new CauseTermMeta() )->register();
 
 		Aggregator::register_hooks();
 
