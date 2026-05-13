@@ -156,7 +156,7 @@ Until the WooCommerce-order Aggregator lands, the running-raised number is drive
 
 Donors who reach the donation form see two **chips** above the submit button — a two-line text label with a small prefix above the value, plus a `[change]` affordance — instead of two raw form fields:
 
-```
+```text
 You are giving to
 Library                            [change]
 

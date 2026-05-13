@@ -998,7 +998,13 @@ final class REST {
 			}
 			if ( $campaign_id > 0 ) {
 				$campaigns = get_post_meta( $post->ID, $campaigns_meta_key, true );
-				$ids       = is_array( $campaigns ) ? array_map( 'intval', $campaigns ) : array();
+				if ( is_array( $campaigns ) ) {
+					$ids = array_values( array_filter( array_map( 'intval', $campaigns ) ) );
+				} elseif ( is_scalar( $campaigns ) && (int) $campaigns > 0 ) {
+					$ids = array( (int) $campaigns );
+				} else {
+					$ids = array();
+				}
 				if ( ! in_array( $campaign_id, $ids, true ) ) {
 					continue;
 				}

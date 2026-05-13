@@ -331,10 +331,21 @@ final class DonationDesignationChips {
 			}
 		}
 
-		// If no campaign in Context yet, infer one from the chip values'
-		// `_giving_*_campaigns` meta so order attribution doesn't fall back to
-		// "default live campaign" and pick the wrong one.
-		if ( 0 === $campaign_id ) {
+		// Reconcile campaign with the chip values. If Context has no campaign,
+		// infer one from the picked team/beneficiary. If Context has a campaign
+		// but the new chip values don't participate in it, recompute — leaving
+		// the stale campaign would persist a mismatched tuple to the order.
+		$team_campaigns = ( $team_id > 0 )
+			? self::campaign_ids_from_meta( $team_id, Team::META_CAMPAIGN_IDS )
+			: array();
+		$ben_campaigns  = ( $beneficiary > 0 )
+			? self::campaign_ids_from_meta( $beneficiary, Beneficiary::META_CAMPAIGN_IDS )
+			: array();
+
+		$team_ok = 0 === $team_id || empty( $team_campaigns ) || in_array( $campaign_id, $team_campaigns, true );
+		$ben_ok  = 0 === $beneficiary || empty( $ben_campaigns ) || in_array( $campaign_id, $ben_campaigns, true );
+
+		if ( 0 === $campaign_id || ! $team_ok || ! $ben_ok ) {
 			$campaign_id = self::infer_campaign_id_from_posts( $team_id, $beneficiary );
 		}
 
