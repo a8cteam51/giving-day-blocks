@@ -19,6 +19,7 @@ use Team51\GivingDay\Admin\SettingsPage;
 use Team51\GivingDay\Data\Aggregator;
 use Team51\GivingDay\Data\Context;
 use Team51\GivingDay\Frontend\SingleTemplates;
+use Team51\GivingDay\Integrations\DonationDesignationChips;
 use Team51\GivingDay\Integrations\OfflineGateway;
 use Team51\GivingDay\Integrations\OrderAttribution;
 use Team51\GivingDay\PostTypes\Beneficiary;
@@ -137,6 +138,13 @@ final class Plugin {
 	public ?OrderAttribution $order_attribution = null;
 
 	/**
+	 * Donation form designation chips (consumer of team51-donations Custom Fields API).
+	 *
+	 * @var DonationDesignationChips|null
+	 */
+	public ?DonationDesignationChips $designation_chips = null;
+
+	/**
 	 * Plugin constructor. Kept protected to enforce the singleton pattern.
 	 */
 	protected function __construct() {
@@ -238,6 +246,9 @@ final class Plugin {
 
 		$this->order_attribution = new OrderAttribution();
 		$this->order_attribution->register();
+
+		$this->designation_chips = new DonationDesignationChips();
+		$this->designation_chips->register();
 
 		OfflineGateway::register();
 

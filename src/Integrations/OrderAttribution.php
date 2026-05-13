@@ -40,6 +40,13 @@ final class OrderAttribution {
 	/**
 	 * Writes attribution meta onto a newly created WC order.
 	 *
+	 * Runs at priority 20 on woocommerce_checkout_create_order. The donation
+	 * form designation chips (see DonationDesignationChips) write at priority
+	 * 10, so any meta they wrote already exists on the order by the time we
+	 * arrive — this method is additive and never overwrites an existing
+	 * value, so the donor's explicit chip choice wins over Context-derived
+	 * attribution.
+	 *
 	 * @param WC_Order $order The order being created.
 	 */
 	public function tag_order( WC_Order $order ): void {
@@ -73,6 +80,22 @@ final class OrderAttribution {
 		$campaign_id    = isset( $attribution['campaign_id'] ) ? absint( $attribution['campaign_id'] ) : 0;
 		$team_id        = isset( $attribution['team_id'] ) ? absint( $attribution['team_id'] ) : 0;
 		$beneficiary_id = isset( $attribution['beneficiary_id'] ) ? absint( $attribution['beneficiary_id'] ) : 0;
+
+		// Prefer values already on the order — typically written by the chip
+		// listener at priority 10. Donor-explicit choices beat session inference.
+		$existing_campaign    = (int) $order->get_meta( self::META_CAMPAIGN_ID, true );
+		$existing_team        = (int) $order->get_meta( self::META_TEAM_ID, true );
+		$existing_beneficiary = (int) $order->get_meta( self::META_BENEFICIARY_ID, true );
+
+		if ( $existing_campaign > 0 ) {
+			$campaign_id = $existing_campaign;
+		}
+		if ( $existing_team > 0 ) {
+			$team_id = $existing_team;
+		}
+		if ( $existing_beneficiary > 0 ) {
+			$beneficiary_id = $existing_beneficiary;
+		}
 
 		if ( 0 === $campaign_id ) {
 			return;
