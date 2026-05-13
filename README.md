@@ -63,6 +63,8 @@ Namespace: `giving-day/v1`. Read endpoints are public; write endpoints require `
 | `GET /match/{id}/progress` | Matched so far, cap, remaining |
 | `GET /challenge/{id}/progress` | Current value, threshold, window remaining |
 | `GET /campaign/{id}/warroom` | Aggregated payload for the dashboard |
+| `GET /teams?q=&limit=&id=&campaign_id=` | Team typeahead source for the donation form's "On behalf of" chip. Returns `[{id, label}, …]`. `id={N}` resolves a single record for URL-prefill. Defaults the scope to the currently-live campaign. |
+| `GET /beneficiaries?q=&limit=&id=&campaign_id=` | Same shape as `/teams`, sourcing the donation form's "Supporting" chip. Labels include the parent unit when present (e.g. *"Dean's Excellence Fund — College of Arts & Sciences"*). |
 
 Every response includes a `server_time` field so client countdowns never drift.
 
@@ -149,6 +151,36 @@ The `countdown` and `totals` blocks accept a `?givingday=` URL parameter that fo
 The override is **only honored for logged-in users** (server-side `is_user_logged_in()` / client-side `body.logged-in`). Anonymous visitors with the parameter see the real state. Each block also has an **Editor preview state** dropdown in the inspector that does the same thing inside the editor canvas.
 
 Until the WooCommerce-order Aggregator lands, the running-raised number is driven by two temporary meta fields on the Campaign — **Dev: raised override** and **Dev: donor count override** — editable from the Campaign sidebar. Both are removed in favor of real aggregation later without changing the block markup.
+
+### Donor designation chips
+
+Donors who reach the donation form see two **chips** above the submit button — a two-line text label with a small prefix above the value, plus a `[change]` affordance — instead of two raw form fields:
+
+```text
+You are giving to
+Library                            [change]
+
+You are giving on behalf of
+Class of 2014 Crew                 [change]
+```
+
+When the donor taps `[change]`, the value swaps in place for a focused typeahead scoped to the currently-live campaign. **ESC** or a click outside cancels without committing. Chips are visually transparent by default — no background, no border, no rounded button — so site themes can style them with their own CSS via the stable class hooks (`.wpcomsp-donations__chip`, `…__chip-prefix`, `…__chip-body`, `…__chip-action`).
+
+The chips are not Giving Day blocks. They are registered against the [team51-donations](../team51-donations/) **Custom Fields API** (`wpcomsp_donations_register_field()`) as two consumer-side fields with `appearance: 'chip'`. The visual treatment and modal interaction live in team51-donations; this plugin only declares the fields, supplies the typeahead REST endpoints (`/teams`, `/beneficiaries`), and routes the donor's selections into `_giving_team_id` / `_giving_beneficiary_id` order meta — the same meta the order-attribution listener writes, so the Aggregator's slicing is unchanged.
+
+Pre-fill priority is: **URL param > session context > empty.**
+
+| Source | Behavior |
+|--------|----------|
+| `?gd_team=701&gd_beneficiary=612` on any page | Chips arrive populated; captains can paste shareable links anywhere. |
+| Visiting a Team or Beneficiary single-post page | `Team51\GivingDay\Data\Context::set()` fires on `template_redirect`; the chip's `default_callback` reads it back. |
+| Donor changes their mind mid-form | The modal commits the new value to the hidden form input. The donor's explicit choice wins over session-derived attribution at order creation. |
+
+The chips are auto-registered when team51-donations is active. Sites that build their own designation UI can opt out via:
+
+```php
+add_filter( 'giving_day_blocks_register_donation_chips', '__return_false' );
+```
 
 ### Per-campaign brand colors
 

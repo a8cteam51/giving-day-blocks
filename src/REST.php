@@ -20,12 +20,15 @@ namespace Team51\GivingDay;
 
 use Team51\GivingDay\Data\Aggregator;
 use Team51\GivingDay\Data\Colors;
+use Team51\GivingDay\Data\Context;
 use Team51\GivingDay\Data\Leaderboard;
 use Team51\GivingDay\Data\MatchProgress;
 use Team51\GivingDay\Data\Status;
+use Team51\GivingDay\Integrations\OrderAttribution;
 use Team51\GivingDay\PostTypes\Beneficiary;
 use Team51\GivingDay\PostTypes\Campaign;
 use Team51\GivingDay\PostTypes\GivingMatch;
+use Team51\GivingDay\PostTypes\Team;
 use Team51\GivingDay\Taxonomies\Cause;
 use Team51\GivingDay\Taxonomies\TeamGroup;
 use WP_Error;
@@ -213,6 +216,30 @@ final class REST {
 
 		register_rest_route(
 			self::NAMESPACE,
+			'/context',
+			array(
+				'methods'             => WP_REST_Server::CREATABLE,
+				'permission_callback' => '__return_true',
+				'args'                => array(
+					'team_id'        => array(
+						'description'       => __( 'Team post ID, or 0 to clear.', 'giving-day-blocks' ),
+						'type'              => 'integer',
+						'required'          => false,
+						'sanitize_callback' => 'absint',
+					),
+					'beneficiary_id' => array(
+						'description'       => __( 'Beneficiary post ID, or 0 to clear.', 'giving-day-blocks' ),
+						'type'              => 'integer',
+						'required'          => false,
+						'sanitize_callback' => 'absint',
+					),
+				),
+				'callback'            => array( $this, 'update_context' ),
+			)
+		);
+
+		register_rest_route(
+			self::NAMESPACE,
 			'/cause-areas',
 			array(
 				'methods'             => WP_REST_Server::READABLE,
@@ -227,6 +254,58 @@ final class REST {
 					),
 				),
 				'callback'            => array( $this, 'get_cause_areas' ),
+			)
+		);
+
+		$designation_args = array(
+			'q'           => array(
+				'description'       => __( 'Optional free-text query (matches post title).', 'giving-day-blocks' ),
+				'type'              => 'string',
+				'default'           => '',
+				'sanitize_callback' => 'sanitize_text_field',
+			),
+			'limit'       => array(
+				'description' => __( 'Maximum rows to return (1–50).', 'giving-day-blocks' ),
+				'type'        => 'integer',
+				'default'     => 20,
+				'minimum'     => 1,
+				'maximum'     => 50,
+			),
+			'id'          => array(
+				'description'       => __( 'Resolve a single record by ID (used for URL-prefill label resolution). When set, q/limit/campaign_id are ignored.', 'giving-day-blocks' ),
+				'type'              => 'integer',
+				'default'           => 0,
+				'minimum'           => 0,
+				'sanitize_callback' => 'absint',
+			),
+			'campaign_id' => array(
+				'description'       => __( 'Scope results to this campaign. Defaults to the currently-live campaign.', 'giving-day-blocks' ),
+				'type'              => 'integer',
+				'default'           => 0,
+				'minimum'           => 0,
+				'sanitize_callback' => 'absint',
+			),
+		);
+
+		register_rest_route(
+			self::NAMESPACE,
+			'/teams',
+			array(
+				'methods'             => WP_REST_Server::READABLE,
+				'permission_callback' => '__return_true',
+				'args'                => $designation_args,
+				'callback'            => array( $this, 'get_designation_teams' ),
+			)
+		);
+
+		register_rest_route(
+			self::NAMESPACE,
+			'/beneficiaries',
+			array(
+				'methods'             => WP_REST_Server::READABLE,
+				'permission_callback' => '__return_true',
+				'args'                => $designation_args,
+				'callback'            => array( $this, 'get_designation_beneficiaries' ),
 			)
 		);
 
@@ -756,6 +835,227 @@ final class REST {
 				'server_time' => gmdate( 'c' ),
 			)
 		);
+	}
+
+	/**
+	 * POST /context — merges the given team / beneficiary IDs into the
+	 * visitor's session context.
+	 *
+	 * Called from the donation form's chip JS so that the admin-bar debug
+	 * widget (and any other Context reader) reflects the donor's pick in real
+	 * time. The donation form's server-side submit path also writes Context
+	 * via the same merge logic (see DonationDesignationChips::sync_request_to_context),
+	 * so attribution survives whether the donor clicks Donate immediately
+	 * after picking, navigates around, or abandons the page.
+	 *
+	 * @param WP_REST_Request $request
+	 * @return WP_REST_Response
+	 */
+	public function update_context( WP_REST_Request $request ): WP_REST_Response {
+		$existing    = Context::get();
+		$campaign_id = (int) ( $existing['campaign_id'] ?? 0 );
+		$team_id     = (int) ( $existing['team_id'] ?? 0 );
+		$beneficiary = (int) ( $existing['beneficiary_id'] ?? 0 );
+
+		$params = $request->get_json_params();
+		if ( ! is_array( $params ) ) {
+			$params = $request->get_params();
+		}
+
+		if ( array_key_exists( 'team_id', $params ) ) {
+			$candidate = absint( $params['team_id'] );
+			if ( $candidate > 0 ) {
+				$post = get_post( $candidate );
+				$team_id = ( $post instanceof WP_Post && \Team51\GivingDay\PostTypes\Team::POST_TYPE === $post->post_type && 'publish' === $post->post_status )
+					? $candidate
+					: $team_id;
+			} else {
+				$team_id = 0;
+			}
+		}
+
+		if ( array_key_exists( 'beneficiary_id', $params ) ) {
+			$candidate = absint( $params['beneficiary_id'] );
+			if ( $candidate > 0 ) {
+				$post = get_post( $candidate );
+				$beneficiary = ( $post instanceof WP_Post && Beneficiary::POST_TYPE === $post->post_type && 'publish' === $post->post_status )
+					? $candidate
+					: $beneficiary;
+			} else {
+				$beneficiary = 0;
+			}
+		}
+
+		Context::set( $campaign_id, $team_id, $beneficiary );
+
+		return $this->respond(
+			array(
+				'campaign_id'    => $campaign_id,
+				'team_id'        => $team_id,
+				'beneficiary_id' => $beneficiary,
+				'server_time'    => gmdate( 'c' ),
+			)
+		);
+	}
+
+	/**
+	 * GET /teams — chip typeahead source for the Team designation field.
+	 *
+	 * Returns a flat list of `{ id, label }` rows matching the
+	 * team51-donations Custom Fields typeahead contract. Scoped to the
+	 * currently-live campaign by default (override with `campaign_id`).
+	 * Passing `id` returns the single matching record for URL-prefill
+	 * label resolution.
+	 *
+	 * @param WP_REST_Request $request
+	 * @return WP_REST_Response
+	 */
+	public function get_designation_teams( WP_REST_Request $request ) {
+		return $this->respond_designation_list(
+			$request,
+			Team::POST_TYPE,
+			Team::META_CAMPAIGN_IDS,
+			false
+		);
+	}
+
+	/**
+	 * GET /beneficiaries — chip typeahead source for the Beneficiary
+	 * designation field. Labels include the parent unit when present so
+	 * donors can disambiguate similarly-named funds across colleges /
+	 * coalitions.
+	 *
+	 * @param WP_REST_Request $request
+	 * @return WP_REST_Response
+	 */
+	public function get_designation_beneficiaries( WP_REST_Request $request ) {
+		return $this->respond_designation_list(
+			$request,
+			Beneficiary::POST_TYPE,
+			Beneficiary::META_CAMPAIGN_IDS,
+			true
+		);
+	}
+
+	/**
+	 * Shared implementation for the Team / Beneficiary typeahead endpoints.
+	 *
+	 * The `_giving_*_campaigns` arrays are stored as serialized post_meta, so
+	 * a `meta_query` LIKE match against the serialized payload would be
+	 * fragile. Instead we pull a bounded candidate pool ordered by title
+	 * (narrowed by `s=` when the donor is typing) and filter in PHP — fine
+	 * for realistic Giving Day datasets (low hundreds of posts max).
+	 *
+	 * @param WP_REST_Request $request
+	 * @param string          $post_type           Team::POST_TYPE or Beneficiary::POST_TYPE.
+	 * @param string          $campaigns_meta_key  The post type's `_giving_*_campaigns` meta key.
+	 * @param bool            $with_unit_label     Append the parent unit to the label (beneficiaries).
+	 * @return WP_REST_Response
+	 */
+	private function respond_designation_list( WP_REST_Request $request, string $post_type, string $campaigns_meta_key, bool $with_unit_label ): WP_REST_Response {
+		$by_id = (int) $request->get_param( 'id' );
+		if ( $by_id > 0 ) {
+			$post  = get_post( $by_id );
+			$items = array();
+			if ( $post instanceof WP_Post && $post_type === $post->post_type && 'publish' === $post->post_status ) {
+				$items[] = $this->format_designation_item( $post, $with_unit_label );
+			}
+			return $this->respond_array( $items );
+		}
+
+		$campaign_id = (int) $request->get_param( 'campaign_id' );
+		if ( $campaign_id <= 0 ) {
+			$campaign_id = OrderAttribution::default_campaign_id();
+		}
+
+		$raw_query = $request->get_param( 'q' );
+		$query_str = is_string( $raw_query ) ? trim( $raw_query ) : '';
+
+		$limit = (int) $request->get_param( 'limit' );
+		if ( $limit <= 0 ) {
+			$limit = 20;
+		}
+
+		$args = array(
+			'post_type'              => $post_type,
+			'post_status'            => 'publish',
+			'posts_per_page'         => 200,
+			'orderby'                => 'title',
+			'order'                  => 'ASC',
+			'no_found_rows'          => true,
+			'update_post_term_cache' => false,
+		);
+		if ( '' !== $query_str ) {
+			$args['s'] = $query_str;
+		}
+
+		$query = new \WP_Query( $args );
+		$items = array();
+
+		foreach ( $query->posts as $post ) {
+			if ( ! $post instanceof WP_Post ) {
+				continue;
+			}
+			if ( $campaign_id > 0 ) {
+				$campaigns = get_post_meta( $post->ID, $campaigns_meta_key, true );
+				if ( is_array( $campaigns ) ) {
+					$ids = array_values( array_filter( array_map( 'intval', $campaigns ) ) );
+				} elseif ( is_scalar( $campaigns ) && (int) $campaigns > 0 ) {
+					$ids = array( (int) $campaigns );
+				} else {
+					$ids = array();
+				}
+				if ( ! in_array( $campaign_id, $ids, true ) ) {
+					continue;
+				}
+			}
+			$items[] = $this->format_designation_item( $post, $with_unit_label );
+			if ( count( $items ) >= $limit ) {
+				break;
+			}
+		}
+
+		return $this->respond_array( $items );
+	}
+
+	/**
+	 * Shapes a single post for the typeahead contract.
+	 *
+	 * @param WP_Post $post
+	 * @param bool    $with_unit_label
+	 * @return array{id:int,label:string}
+	 */
+	private function format_designation_item( WP_Post $post, bool $with_unit_label ): array {
+		$title = self::decode_text( get_the_title( $post ) );
+
+		if ( $with_unit_label ) {
+			$unit = self::decode_text( Beneficiary::display_unit_label( (int) $post->ID ) );
+			if ( '' !== $unit && $unit !== $title ) {
+				/* translators: 1: beneficiary / fund title, 2: parent unit (college, coalition, etc). */
+				$title = sprintf( _x( '%1$s — %2$s', 'beneficiary chip label', 'giving-day-blocks' ), $title, $unit );
+			}
+		}
+
+		return array(
+			'id'    => (int) $post->ID,
+			'label' => $title,
+		);
+	}
+
+	/**
+	 * Wraps a flat array payload in a no-store response.
+	 *
+	 * Used by endpoints whose contract is a raw JSON array (e.g. the
+	 * team51-donations typeahead contract `[{id,label},…]`). Distinct from
+	 * {@see self::respond()} which wraps an associative payload.
+	 *
+	 * @param array<int, mixed> $data
+	 * @return WP_REST_Response
+	 */
+	private function respond_array( array $data ): WP_REST_Response {
+		$response = new WP_REST_Response( $data );
+		$response->header( 'Cache-Control', 'no-store' );
+		return $response;
 	}
 
 	/**

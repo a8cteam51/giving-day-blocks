@@ -33,11 +33,18 @@ final class Context {
 
 	/**
 	 * URL query parameters that can set context from external links.
+	 *
+	 * Deliberately `gd_*`-prefixed rather than `giving_*`. The Team and
+	 * Beneficiary CPTs are registered with `publicly_queryable=true`, which
+	 * makes WordPress auto-register query vars named exactly `giving_team`
+	 * and `giving_beneficiary` — any URL like `?giving_team=N` is then
+	 * interpreted as "look up that CPT post by slug N" and yields a 404 for
+	 * a numeric ID. `gd_*` is namespaced and doesn't collide.
 	 */
 	private const QUERY_PARAMS = array(
-		'giving_campaign'    => 'campaign_id',
-		'giving_team'        => 'team_id',
-		'giving_beneficiary' => 'beneficiary_id',
+		'gd_campaign'    => 'campaign_id',
+		'gd_team'        => 'team_id',
+		'gd_beneficiary' => 'beneficiary_id',
 	);
 
 	/**
