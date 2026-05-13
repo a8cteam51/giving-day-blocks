@@ -48,12 +48,17 @@ final class DonationDesignationChips {
 	public const FIELD_TEAM        = 'giving_day_team';
 
 	/**
-	 * Hooks registration onto `init` (after team51-donations bootstraps) and
-	 * subscribes to the team51-donations persistence action.
+	 * Hooks registration onto `init` (after team51-donations bootstraps),
+	 * subscribes to the team51-donations persistence action, and bridges
+	 * chip submissions back into Context.
 	 */
 	public function register(): void {
 		add_action( 'init', array( $this, 'maybe_register_fields' ), 20 );
 		add_action( 'wpcomsp_donations_field_value_received', array( $this, 'persist_value' ), 10, 3 );
+
+		// Mirrors the donation-form submission's chip values into Context
+		add_action( 'wp_loaded', array( $this, 'sync_request_to_context' ), 16 );
+		add_action( 'wp_enqueue_scripts', array( $this, 'enqueue_chip_context_sync' ), 20 );
 	}
 
 	/**
@@ -94,7 +99,7 @@ final class DonationDesignationChips {
 				'chip_placeholder'  => __( 'General fund', 'giving-day-blocks' ),
 				'chip_value_prefix' => __( 'You are giving to', 'giving-day-blocks' ),
 				'options_endpoint'  => rest_url( REST::NAMESPACE . '/beneficiaries' ),
-				'url_param'         => 'giving_beneficiary',
+				'url_param'         => 'gd_beneficiary',
 				'sanitize_callback' => 'absint',
 				'validate_callback' => array( $this, 'validate_beneficiary' ),
 				'default_callback'  => array( $this, 'default_beneficiary' ),
@@ -108,11 +113,12 @@ final class DonationDesignationChips {
 				'type'              => 'typeahead',
 				'label'             => __( 'Are you part of a team?', 'giving-day-blocks' ),
 				'placeholder'       => __( 'Search teams…', 'giving-day-blocks' ),
-				'chip_placeholder'  => __( 'No team selected', 'giving-day-blocks' ),
-				'chip_action_label' => __( 'add a team', 'giving-day-blocks' ),
-				'chip_value_prefix' => __( 'You are giving on behalf of', 'giving-day-blocks' ),
+				'chip_placeholder'         => __( 'No team selected', 'giving-day-blocks' ),
+				'chip_action_label_add'    => __( 'add a team', 'giving-day-blocks' ),
+				'chip_action_label_change' => __( 'change', 'giving-day-blocks' ),
+				'chip_value_prefix'        => __( 'You are giving on behalf of', 'giving-day-blocks' ),
 				'options_endpoint'  => rest_url( REST::NAMESPACE . '/teams' ),
-				'url_param'         => 'giving_team',
+				'url_param'         => 'gd_team',
 				'sanitize_callback' => 'absint',
 				'validate_callback' => array( $this, 'validate_team' ),
 				'default_callback'  => array( $this, 'default_team' ),
@@ -216,6 +222,173 @@ final class DonationDesignationChips {
 			$order->update_meta_data( OrderAttribution::META_TEAM_ID, $id );
 			$this->maybe_reconcile_campaign( $order, $id, Team::META_CAMPAIGN_IDS );
 		}
+	}
+
+	/**
+	 * Attaches a small inline script that POSTs each chip commit to the
+	 * `/giving-day/v1/context` endpoint. Only attaches when the
+	 * team51-donations custom-fields script handle is enqueued on the page.
+	 *
+	 * @internal Hooked on wp_enqueue_scripts priority 20 (after team51-donations
+	 *           registers its `wpcomsp-donations-custom-fields` handle).
+	 */
+	public function enqueue_chip_context_sync(): void {
+		$handle = 'wpcomsp-donations-custom-fields';
+		if ( ! wp_script_is( $handle, 'enqueued' ) && ! wp_script_is( $handle, 'registered' ) ) {
+			return;
+		}
+
+		$endpoint = esc_url_raw( rest_url( REST::NAMESPACE . '/context' ) );
+		$nonce    = is_user_logged_in() ? wp_create_nonce( 'wp_rest' ) : '';
+
+		$script = sprintf(
+			'(function(){
+				var endpoint = %1$s;
+				var nonce = %2$s;
+				if ( ! endpoint || typeof window === "undefined" ) { return; }
+				document.addEventListener( "wpcomsp-donations:chip-committed", function( e ) {
+					var detail = ( e && e.detail ) || {};
+					var fieldId = detail.fieldId || "";
+					var body = {};
+					if ( "giving_day_team" === fieldId ) {
+						body.team_id = parseInt( detail.id, 10 ) || 0;
+					} else if ( "giving_day_beneficiary" === fieldId ) {
+						body.beneficiary_id = parseInt( detail.id, 10 ) || 0;
+					} else {
+						return;
+					}
+					var headers = { "Content-Type": "application/json" };
+					if ( nonce ) { headers["X-WP-Nonce"] = nonce; }
+					fetch( endpoint, {
+						method: "POST",
+						credentials: "same-origin",
+						headers: headers,
+						body: JSON.stringify( body )
+					} ).catch( function() { /* best-effort sync */ } );
+				} );
+			})();',
+			wp_json_encode( $endpoint ),
+			wp_json_encode( $nonce )
+		);
+
+		wp_add_inline_script( $handle, $script );
+	}
+
+	/**
+	 * Reads the chip values out of a donation-form submission and writes them
+	 * into Context, so attribution survives any quirk of the team51-donations
+	 * session-store path. Runs on wp_loaded priority 16.
+	 *
+	 * Gated on the donation-form nonce (same gate Submission::capture_form
+	 * uses) so we only act on real form submissions.
+	 *
+	 * @internal Hooked on wp_loaded priority 16.
+	 */
+	public function sync_request_to_context(): void {
+		// phpcs:ignore WordPress.Security.NonceVerification.Recommended
+		if ( ! isset( $_REQUEST['wpcomsp-donation-nonce'] ) ) {
+			return;
+		}
+		// phpcs:ignore WordPress.Security.NonceVerification.Recommended
+		if ( ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_REQUEST['wpcomsp-donation-nonce'] ) ), 'wpcomsp-donation' ) ) {
+			return;
+		}
+
+		$has_beneficiary_input = isset( $_REQUEST[ self::FIELD_BENEFICIARY ] );
+		$has_team_input        = isset( $_REQUEST[ self::FIELD_TEAM ] );
+		if ( ! $has_beneficiary_input && ! $has_team_input ) {
+			return;
+		}
+
+		$current     = Context::get();
+		$campaign_id = (int) ( $current['campaign_id'] ?? 0 );
+		$team_id     = (int) ( $current['team_id'] ?? 0 );
+		$beneficiary = (int) ( $current['beneficiary_id'] ?? 0 );
+
+		if ( $has_beneficiary_input ) {
+			// phpcs:ignore WordPress.Security.NonceVerification.Recommended
+			$candidate = absint( wp_unslash( $_REQUEST[ self::FIELD_BENEFICIARY ] ) );
+			if ( $candidate > 0 ) {
+				$post = get_post( $candidate );
+				$beneficiary = ( $post && Beneficiary::POST_TYPE === $post->post_type && 'publish' === $post->post_status )
+					? $candidate
+					: 0;
+			} else {
+				$beneficiary = 0;
+			}
+		}
+
+		if ( $has_team_input ) {
+			// phpcs:ignore WordPress.Security.NonceVerification.Recommended
+			$candidate = absint( wp_unslash( $_REQUEST[ self::FIELD_TEAM ] ) );
+			if ( $candidate > 0 ) {
+				$post = get_post( $candidate );
+				$team_id = ( $post && Team::POST_TYPE === $post->post_type && 'publish' === $post->post_status )
+					? $candidate
+					: 0;
+			} else {
+				$team_id = 0;
+			}
+		}
+
+		// If no campaign in Context yet, infer one from the chip values'
+		// `_giving_*_campaigns` meta so order attribution doesn't fall back to
+		// "default live campaign" and pick the wrong one.
+		if ( 0 === $campaign_id ) {
+			$campaign_id = self::infer_campaign_id_from_posts( $team_id, $beneficiary );
+		}
+
+		Context::set( $campaign_id, $team_id, $beneficiary );
+	}
+
+	/**
+	 * Returns a campaign ID shared by the given Team and Beneficiary posts,
+	 * preferring an intersection when both are present, falling back to the
+	 * first campaign of whichever is set.
+	 *
+	 * @param int $team_id        Team post ID (0 if not set).
+	 * @param int $beneficiary_id Beneficiary post ID (0 if not set).
+	 * @return int Campaign post ID, or 0 if nothing usable was found.
+	 */
+	private static function infer_campaign_id_from_posts( int $team_id, int $beneficiary_id ): int {
+		$team_campaigns = ( $team_id > 0 )
+			? self::campaign_ids_from_meta( $team_id, Team::META_CAMPAIGN_IDS )
+			: array();
+		$ben_campaigns  = ( $beneficiary_id > 0 )
+			? self::campaign_ids_from_meta( $beneficiary_id, Beneficiary::META_CAMPAIGN_IDS )
+			: array();
+
+		if ( ! empty( $team_campaigns ) && ! empty( $ben_campaigns ) ) {
+			$shared = array_values( array_intersect( $team_campaigns, $ben_campaigns ) );
+			if ( ! empty( $shared ) ) {
+				return (int) $shared[0];
+			}
+		}
+		if ( ! empty( $ben_campaigns ) ) {
+			return (int) $ben_campaigns[0];
+		}
+		if ( ! empty( $team_campaigns ) ) {
+			return (int) $team_campaigns[0];
+		}
+		return 0;
+	}
+
+	/**
+	 * Reads a `_giving_*_campaigns` meta value as a list of int IDs.
+	 *
+	 * @param int    $post_id  Post whose meta we are reading.
+	 * @param string $meta_key Meta key holding the participating campaign IDs.
+	 * @return array<int, int>
+	 */
+	private static function campaign_ids_from_meta( int $post_id, string $meta_key ): array {
+		$raw = get_post_meta( $post_id, $meta_key, true );
+		if ( is_array( $raw ) ) {
+			return array_values( array_filter( array_map( 'intval', $raw ) ) );
+		}
+		if ( is_scalar( $raw ) && (int) $raw > 0 ) {
+			return array( (int) $raw );
+		}
+		return array();
 	}
 
 	/**

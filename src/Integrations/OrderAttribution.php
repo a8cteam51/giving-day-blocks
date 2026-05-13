@@ -30,10 +30,17 @@ final class OrderAttribution {
 	public const META_BENEFICIARY_ID = '_giving_beneficiary_id';
 
 	/**
-	 * Registers the checkout hook.
+	 * Registers the checkout hooks.
+	 *
+	 * Hooks both the classic checkout (`woocommerce_checkout_create_order`)
+	 * and the WC Blocks / Store API checkout
+	 * (`woocommerce_store_api_checkout_update_order_from_request`). Both
+	 * actions fire just before `$order->save()`, so `update_meta_data()`
+	 * calls in either path persist.
 	 */
 	public function register(): void {
 		add_action( 'woocommerce_checkout_create_order', array( $this, 'tag_order' ), 20, 1 );
+		add_action( 'woocommerce_store_api_checkout_update_order_from_request', array( $this, 'tag_order' ), 20, 1 );
 		add_action( 'admin_notices', array( $this, 'maybe_render_overlap_notice' ) );
 	}
 

@@ -20,6 +20,7 @@ namespace Team51\GivingDay;
 
 use Team51\GivingDay\Data\Aggregator;
 use Team51\GivingDay\Data\Colors;
+use Team51\GivingDay\Data\Context;
 use Team51\GivingDay\Data\Leaderboard;
 use Team51\GivingDay\Data\MatchProgress;
 use Team51\GivingDay\Data\Status;
@@ -210,6 +211,30 @@ final class REST {
 				'permission_callback' => array( $this, 'check_campaign_edit_and_products' ),
 				'args'                => array( 'id' => $args['id'] ),
 				'callback'            => array( $this, 'create_campaign_donation_product' ),
+			)
+		);
+
+		register_rest_route(
+			self::NAMESPACE,
+			'/context',
+			array(
+				'methods'             => WP_REST_Server::CREATABLE,
+				'permission_callback' => '__return_true',
+				'args'                => array(
+					'team_id'        => array(
+						'description'       => __( 'Team post ID, or 0 to clear.', 'giving-day-blocks' ),
+						'type'              => 'integer',
+						'required'          => false,
+						'sanitize_callback' => 'absint',
+					),
+					'beneficiary_id' => array(
+						'description'       => __( 'Beneficiary post ID, or 0 to clear.', 'giving-day-blocks' ),
+						'type'              => 'integer',
+						'required'          => false,
+						'sanitize_callback' => 'absint',
+					),
+				),
+				'callback'            => array( $this, 'update_context' ),
 			)
 		);
 
@@ -808,6 +833,67 @@ final class REST {
 				'search'      => $search,
 				'items'       => $items,
 				'server_time' => gmdate( 'c' ),
+			)
+		);
+	}
+
+	/**
+	 * POST /context — merges the given team / beneficiary IDs into the
+	 * visitor's session context.
+	 *
+	 * Called from the donation form's chip JS so that the admin-bar debug
+	 * widget (and any other Context reader) reflects the donor's pick in real
+	 * time. The donation form's server-side submit path also writes Context
+	 * via the same merge logic (see DonationDesignationChips::sync_request_to_context),
+	 * so attribution survives whether the donor clicks Donate immediately
+	 * after picking, navigates around, or abandons the page.
+	 *
+	 * @param WP_REST_Request $request
+	 * @return WP_REST_Response
+	 */
+	public function update_context( WP_REST_Request $request ): WP_REST_Response {
+		$existing    = Context::get();
+		$campaign_id = (int) ( $existing['campaign_id'] ?? 0 );
+		$team_id     = (int) ( $existing['team_id'] ?? 0 );
+		$beneficiary = (int) ( $existing['beneficiary_id'] ?? 0 );
+
+		$params = $request->get_json_params();
+		if ( ! is_array( $params ) ) {
+			$params = $request->get_params();
+		}
+
+		if ( array_key_exists( 'team_id', $params ) ) {
+			$candidate = absint( $params['team_id'] );
+			if ( $candidate > 0 ) {
+				$post = get_post( $candidate );
+				$team_id = ( $post instanceof WP_Post && \Team51\GivingDay\PostTypes\Team::POST_TYPE === $post->post_type && 'publish' === $post->post_status )
+					? $candidate
+					: $team_id;
+			} else {
+				$team_id = 0;
+			}
+		}
+
+		if ( array_key_exists( 'beneficiary_id', $params ) ) {
+			$candidate = absint( $params['beneficiary_id'] );
+			if ( $candidate > 0 ) {
+				$post = get_post( $candidate );
+				$beneficiary = ( $post instanceof WP_Post && Beneficiary::POST_TYPE === $post->post_type && 'publish' === $post->post_status )
+					? $candidate
+					: $beneficiary;
+			} else {
+				$beneficiary = 0;
+			}
+		}
+
+		Context::set( $campaign_id, $team_id, $beneficiary );
+
+		return $this->respond(
+			array(
+				'campaign_id'    => $campaign_id,
+				'team_id'        => $team_id,
+				'beneficiary_id' => $beneficiary,
+				'server_time'    => gmdate( 'c' ),
 			)
 		);
 	}

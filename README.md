@@ -172,7 +172,7 @@ Pre-fill priority is: **URL param > session context > empty.**
 
 | Source | Behavior |
 |--------|----------|
-| `?giving_team=701&giving_beneficiary=612` on any page | Chips arrive populated; captains can paste shareable links anywhere. |
+| `?gd_team=701&gd_beneficiary=612` on any page | Chips arrive populated; captains can paste shareable links anywhere. |
 | Visiting a Team or Beneficiary single-post page | `Team51\GivingDay\Data\Context::set()` fires on `template_redirect`; the chip's `default_callback` reads it back. |
 | Donor changes their mind mid-form | The modal commits the new value to the hidden form input. The donor's explicit choice wins over session-derived attribution at order creation. |
 
