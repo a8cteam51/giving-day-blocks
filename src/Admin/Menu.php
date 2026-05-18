@@ -65,6 +65,7 @@ final class Menu {
 			'edit.php?post_type=' . Challenge::POST_TYPE,
 			OfflineDonations::PAGE_SLUG,
 			ResultsPage::PAGE_SLUG,
+			ImportPage::PAGE_SLUG,
 			SettingsPage::PAGE_SLUG,
 		);
 

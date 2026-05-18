@@ -82,11 +82,12 @@ final class Leaderboard {
 		if ( $group_by_parent_id > 0 ) {
 			$payload = self::fetch_grouped( $campaign_id, $dimension, $limit, $group_by_parent_id );
 		} else {
-			$rows    = self::compute_rows( $campaign_id, $dimension, $limit, $filter_term_id );
+			$bucket  = self::compute_rows( $campaign_id, $dimension, $limit, $filter_term_id );
 			$payload = array(
 				'campaign_id' => $campaign_id,
 				'dimension'   => $dimension,
-				'rows'        => $rows,
+				'rows'        => $bucket['rows'],
+				'total'       => $bucket['total'],
 			);
 		}
 
@@ -128,19 +129,32 @@ final class Leaderboard {
 			)
 		);
 
+		// Fall back to flat-rows mode when the parent has no children: treat
+		// the parent itself as a filter and return a single ungrouped list.
+		// Without this, an admin who picks a parent before its children exist
+		// sees an empty block.
+		if ( ! is_array( $children ) || array() === $children ) {
+			$bucket = self::compute_rows( $campaign_id, $dimension, $limit, $group_by_parent_id );
+			return array(
+				'campaign_id' => $campaign_id,
+				'dimension'   => $dimension,
+				'rows'        => $bucket['rows'],
+				'total'       => $bucket['total'],
+			);
+		}
+
 		$groups = array();
-		if ( is_array( $children ) ) {
-			foreach ( $children as $term ) {
-				if ( ! $term instanceof \WP_Term ) {
-					continue;
-				}
-				$child_filter = $term->term_id;
-				$rows         = self::compute_rows( $campaign_id, $dimension, $limit, $child_filter );
-				$groups[]     = array(
-					'term' => self::serialize_term( $term ),
-					'rows' => $rows,
-				);
+		foreach ( $children as $term ) {
+			if ( ! $term instanceof \WP_Term ) {
+				continue;
 			}
+			$child_filter = $term->term_id;
+			$bucket       = self::compute_rows( $campaign_id, $dimension, $limit, $child_filter );
+			$groups[]     = array(
+				'term'  => self::serialize_term( $term ),
+				'rows'  => $bucket['rows'],
+				'total' => $bucket['total'],
+			);
 		}
 
 		return array(
@@ -155,7 +169,8 @@ final class Leaderboard {
 	 * @param string $dimension       Dimension.
 	 * @param int    $limit           Max rows.
 	 * @param int    $filter_term_id  Optional taxonomy filter (team category or cause, by dimension).
-	 * @return list<array<string, mixed>>
+	 * @return array{rows: list<array<string, mixed>>, total: int} Decorated rows plus the total
+	 *         number of buckets before slicing (used by the front-end to gate the "Show all" button).
 	 */
 	private static function compute_rows( int $campaign_id, string $dimension, int $limit, int $filter_term_id ): array {
 		$filter_term_id = self::normalize_filter_term_id( $dimension, $filter_term_id );
@@ -244,6 +259,7 @@ final class Leaderboard {
 			}
 		);
 
+		$total = count( $buckets );
 		$slice = array_slice( array_values( $buckets ), 0, $limit );
 		$rows  = array();
 		$rank  = 1;
@@ -252,7 +268,10 @@ final class Leaderboard {
 			++$rank;
 		}
 
-		return $rows;
+		return array(
+			'rows'  => $rows,
+			'total' => $total,
+		);
 	}
 
 	/**

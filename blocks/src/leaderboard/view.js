@@ -1,12 +1,15 @@
 /**
  * Front-end hydration for giving-day/leaderboard.
  */
-import { createRoot } from '@wordpress/element';
+import { createRoot, useMemo, useState } from '@wordpress/element';
 
 import { useLeaderboard } from '../_shared/hooks/useLeaderboard';
 import { useCampaignStatus } from '../_shared/hooks/useCampaignStatus';
 
 import LeaderboardBody from './LeaderboardBody';
+
+// Matches the REST endpoint's hard cap; see REST.php leaderboard route.
+const EXPANDED_LIMIT = 100;
 
 function parseJSON( raw, fallback ) {
 	if ( ! raw ) {
@@ -43,8 +46,21 @@ function LeaderboardView( { root } ) {
 	const showAmount = root.dataset.showAmount === '1';
 	const showAvatar = root.dataset.showAvatar === '1';
 	const refreshMs = parseInt( root.dataset.refreshMs || '15000', 10 );
-	const query = parseQuery( root );
+	const baseQuery = parseQuery( root );
 	const initialData = parseJSON( root.dataset.initial, null );
+	const collapsedLimit = baseQuery.limit;
+
+	const [ expanded, setExpanded ] = useState( false );
+
+	const query = useMemo(
+		() => ( {
+			...baseQuery,
+			limit: expanded ? EXPANDED_LIMIT : collapsedLimit,
+		} ),
+		// baseQuery comes from the DOM once; expansion only toggles `limit`.
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+		[ expanded ]
+	);
 
 	const { status } = useCampaignStatus( campaignId );
 	let intervalMs = 60000;
@@ -61,16 +77,20 @@ function LeaderboardView( { root } ) {
 
 	const rows = data?.rows;
 	const groups = data?.groups;
+	const total = data?.total;
 	const currency = data?.currency || 'USD';
 
 	return (
 		<LeaderboardBody
 			rows={ rows }
 			groups={ groups }
+			total={ total }
 			currency={ currency }
 			showAmount={ showAmount }
 			showAvatar={ showAvatar }
 			loading={ loading }
+			expanded={ expanded }
+			onToggleExpand={ () => setExpanded( ( v ) => ! v ) }
 		/>
 	);
 }
