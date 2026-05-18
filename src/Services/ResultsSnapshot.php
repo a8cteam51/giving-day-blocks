@@ -258,11 +258,16 @@ final class ResultsSnapshot {
 			return;
 		}
 
+		$donation_amount = Aggregator::donation_total_for_order( $order );
+		if ( $donation_amount <= 0 ) {
+			return;
+		}
+
 		Aggregator::record_adjustment(
 			$campaign_id,
 			array(
 				'type'           => 'offline_added',
-				'delta_amount'   => Aggregator::donation_total_for_order( $order ),
+				'delta_amount'   => $donation_amount,
 				'delta_count'    => 1,
 				'beneficiary_id' => (int) $order->get_meta( OrderAttribution::META_BENEFICIARY_ID ),
 				'team_id'        => (int) $order->get_meta( OrderAttribution::META_TEAM_ID ),

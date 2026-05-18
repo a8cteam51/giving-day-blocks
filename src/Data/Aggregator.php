@@ -285,14 +285,23 @@ final class Aggregator {
 	/**
 	 * Reads the append-only adjustments log for a campaign.
 	 *
+	 * Each adjustment is stored as its own non-unique post_meta row so
+	 * concurrent writes via {@see self::record_adjustment()} can't race
+	 * — two simultaneous handlers (e.g. a refund + a late offline donation
+	 * landing in the same request cycle) both `INSERT` and neither
+	 * clobbers the other. WP unserializes each value, so
+	 * `get_post_meta( …, false )` returns a flat list of adjustment arrays
+	 * in insertion (meta_id) order, which is also the chronological order
+	 * the admin breakdown displays.
+	 *
 	 * @param int $campaign_id Campaign post ID.
-	 * @return list<array<string, mixed>>
+	 * @return array<int, array<string, mixed>>
 	 */
 	public static function read_adjustments( int $campaign_id ): array {
 		if ( $campaign_id <= 0 ) {
 			return array();
 		}
-		$raw = get_post_meta( $campaign_id, self::META_RESULTS_ADJUSTMENTS, true );
+		$raw = get_post_meta( $campaign_id, self::META_RESULTS_ADJUSTMENTS, false );
 		if ( ! is_array( $raw ) ) {
 			return array();
 		}
@@ -446,9 +455,13 @@ final class Aggregator {
 			'reason'         => isset( $entry['reason'] ) ? sanitize_text_field( (string) $entry['reason'] ) : '',
 		);
 
-		$log   = self::read_adjustments( $campaign_id );
-		$log[] = $normalized;
-		update_post_meta( $campaign_id, self::META_RESULTS_ADJUSTMENTS, $log );
+		// Atomic append as a non-unique meta row. The previous read-modify-write
+		// of a single serialized array could lose entries when two adjustment
+		// handlers (e.g. a refund + a late offline donation) ran concurrently:
+		// both would read the same prior log, push their entry, and the second
+		// write would clobber the first. add_post_meta is a single INSERT,
+		// so concurrent writers all land.
+		add_post_meta( $campaign_id, self::META_RESULTS_ADJUSTMENTS, $normalized, false );
 
 		// Force a fresh read on the next totals lookup; transients holding
 		// pre-adjustment numbers must not win.
