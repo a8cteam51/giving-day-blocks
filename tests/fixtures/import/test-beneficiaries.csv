@@ -1,0 +1,26 @@
+﻿title,slug,parent_slug,goal_amount,parent_org,excerpt,causes,campaigns
+"College of Arts & Sciences",college-of-arts-and-sciences,,50000,,"The college's flagship discretionary fund.","arts,education",sample-giving-day-2026
+"College of Engineering",college-of-engineering,,75000,,"Programs across every engineering discipline.","technology,education",sample-giving-day-2026
+"College of Sciences",college-of-sciences,,60000,,"Research and undergraduate science programs.","science,education",sample-giving-day-2026
+"Library Fund",library-fund,college-of-arts-and-sciences,10000,,"Books, materials, and digital archives.","education,arts",sample-giving-day-2026
+"Music Department Fund",music-department-fund,college-of-arts-and-sciences,5000,,"Instruments, performance space, and scholarships.",arts,sample-giving-day-2026
+"Drama Program Fund",drama-program-fund,college-of-arts-and-sciences,4000,,"Set design, costumes, and student touring productions.",arts,sample-giving-day-2026
+"Writing Center",writing-center,college-of-arts-and-sciences,3000,,"One-on-one writing tutoring for students in every major.","education,arts",sample-giving-day-2026
+"History Department Fund",history-department-fund,college-of-arts-and-sciences,6000,,"Research grants and archive preservation.",education,sample-giving-day-2026
+"Robotics Lab",robotics-lab,college-of-engineering,8000,,"Hardware, software, and competition travel.",technology,sample-giving-day-2026
+"Computer Science Department",computer-science-department,college-of-engineering,12000,,"Lab equipment and undergraduate research stipends.","technology,education",sample-giving-day-2026
+"Materials Science Fund",materials-science-fund,college-of-engineering,7000,,"Advanced materials and nanotech research.","science,technology",sample-giving-day-2026
+"Renewable Energy Lab",renewable-energy-lab,college-of-engineering,15000,,"Solar, wind, and battery research projects.","science,technology",sample-giving-day-2026
+"Engineering Scholarships",engineering-scholarships,college-of-engineering,20000,,"Need-based scholarships in every engineering major.",education,sample-giving-day-2026
+"Center for Planetary Studies",center-for-planetary-studies,college-of-sciences,18000,,"Astronomy, astrobiology, and space science research.",science,sample-giving-day-2026
+"Marine Biology Fund",marine-biology-fund,college-of-sciences,9000,,"Coastal ecosystem and species research.",science,sample-giving-day-2026
+"Sustainable Agriculture Institute",sustainable-agriculture-institute,college-of-sciences,11000,,"Regenerative agriculture and food systems research.","science,community",sample-giving-day-2026
+"Physics Department",physics-department,college-of-sciences,10000,,"Lab equipment and theoretical research.",science,sample-giving-day-2026
+"Mathematics Department",mathematics-department,college-of-sciences,7500,,"Conference travel and research grants.","science,education",sample-giving-day-2026
+"Annual Fund",annual-fund,,100000,,"Unrestricted support for the university's highest priorities.",education,sample-giving-day-2026
+"General Scholarship Fund",general-scholarship-fund,,50000,,"Need-based scholarships across all majors and class years.",education,sample-giving-day-2026
+"Football Scholarship",football-scholarship,,25000,,"Athletic and need-based scholarships for football players.",athletics,sample-giving-day-2026
+"Basketball Scholarship",basketball-scholarship,,20000,,"Athletic and need-based scholarships for basketball players.",athletics,sample-giving-day-2026
+"Mental Health Services",mental-health-services,,15000,"Member of: Health Coalition of Central Counties","Counseling, peer support, and wellness programs.","health,community",sample-giving-day-2026
+"Diversity & Inclusion",diversity-and-inclusion,,12000,,"Programs supporting first-generation and underrepresented students.","community,education",sample-giving-day-2026
+"Career Center",career-center,,8000,,"Career counseling, resume reviews, and internship placement.","education,community",sample-giving-day-2026

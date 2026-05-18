@@ -147,6 +147,24 @@ $wrapper_attrs = get_block_wrapper_attributes(
 	)
 );
 
+$can_expand = false;
+if ( ! empty( $data['groups'] ) && is_array( $data['groups'] ) ) {
+	foreach ( $data['groups'] as $g ) {
+		$g_count = isset( $g['rows'] ) && is_array( $g['rows'] ) ? count( $g['rows'] ) : 0;
+		$g_total = isset( $g['total'] ) ? (int) $g['total'] : $g_count;
+		if ( $g_total > $g_count ) {
+			$can_expand = true;
+			break;
+		}
+	}
+} else {
+	$flat_count = isset( $data['rows'] ) && is_array( $data['rows'] ) ? count( $data['rows'] ) : 0;
+	$flat_total = isset( $data['total'] ) ? (int) $data['total'] : $flat_count;
+	if ( $flat_total > $flat_count ) {
+		$can_expand = true;
+	}
+}
+
 ?>
 <div <?php echo $wrapper_attrs; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>>
 	<div class="giving-day-leaderboard__inner">
@@ -187,6 +205,16 @@ $wrapper_attrs = get_block_wrapper_attributes(
 		else :
 			?>
 			<p class="giving-day-leaderboard__empty"><?php esc_html_e( 'No leaderboard data yet.', 'giving-day-blocks' ); ?></p>
-		<?php endif; ?>
+			<?php
+		endif;
+
+		if ( $can_expand ) :
+			?>
+			<button type="button" class="giving-day-leaderboard__expand" aria-expanded="false">
+				<?php esc_html_e( 'Show all', 'giving-day-blocks' ); ?>
+			</button>
+			<?php
+		endif;
+		?>
 	</div>
 </div>

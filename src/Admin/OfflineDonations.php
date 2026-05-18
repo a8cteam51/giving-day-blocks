@@ -16,6 +16,7 @@ use Team51\GivingDay\PostTypes\Beneficiary;
 use Team51\GivingDay\PostTypes\Campaign;
 use Team51\GivingDay\PostTypes\Team;
 use Team51\GivingDay\Services\CampaignSetup;
+use Team51\GivingDay\Services\Importer;
 use Team51\GivingDay\Services\OfflineDonations as OfflineService;
 
 defined( 'ABSPATH' ) || exit;
@@ -25,13 +26,13 @@ defined( 'ABSPATH' ) || exit;
  */
 final class OfflineDonations {
 
-	public const PAGE_SLUG           = 'giving-day-offline-donations';
-	public const NONCE_ACTION        = 'giving_day_offline_donation_save';
-	public const NONCE_ACTION_CREATE = 'giving_day_offline_create_product';
-	public const REQUIRED_CAP        = 'edit_shop_orders';
-	public const REQUIRED_CAP_CREATE = 'edit_products';
+	public const PAGE_SLUG               = 'giving-day-offline-donations';
+	public const NONCE_ACTION            = 'giving_day_offline_donation_save';
+	public const NONCE_ACTION_CREATE     = 'giving_day_offline_create_product';
+	public const REQUIRED_CAP            = 'edit_shop_orders';
+	public const REQUIRED_CAP_CREATE     = 'edit_products';
 	private const DRAFT_TRANSIENT_PREFIX = 'giving_day_offline_draft_';
-	private const DRAFT_TTL_SECONDS  = 15 * MINUTE_IN_SECONDS;
+	private const DRAFT_TTL_SECONDS      = 15 * MINUTE_IN_SECONDS;
 
 	/**
 	 * Hooks the submenu registration and form handler.
@@ -70,8 +71,10 @@ final class OfflineDonations {
 		echo '<h1 class="wp-heading-inline">' . esc_html__( 'Offline Donations', 'giving-day-blocks' ) . '</h1>';
 
 		if ( 'new' !== $action ) {
-			$new_url = add_query_arg( array( 'action' => 'new' ), self::page_url() );
+			$new_url    = add_query_arg( array( 'action' => 'new' ), self::page_url() );
+			$import_url = ImportPage::url_for_type( Importer::TYPE_DONATIONS );
 			echo ' <a href="' . esc_url( $new_url ) . '" class="page-title-action">' . esc_html__( 'Add Donation', 'giving-day-blocks' ) . '</a>';
+			echo ' <a href="' . esc_url( $import_url ) . '" class="page-title-action">' . esc_html__( 'Import data', 'giving-day-blocks' ) . '</a>';
 		}
 
 		echo '<hr class="wp-header-end" />';

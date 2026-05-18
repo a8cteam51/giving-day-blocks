@@ -79,6 +79,30 @@
 		font-style: italic;
 	}
 
+	&__expand {
+		align-self: flex-start;
+		appearance: none;
+		background: transparent;
+		border: 1px solid color-mix(in srgb, var(--giving-day-muted) 35%, transparent);
+		border-radius: var(--giving-day-radius, 12px);
+		color: var(--giving-day-primary);
+		cursor: pointer;
+		font: inherit;
+		font-weight: 600;
+		margin-top: 0.5rem;
+		padding: 0.5rem 0.9rem;
+
+		&:hover,
+		&:focus-visible {
+			background: color-mix(in srgb, var(--giving-day-primary) 8%, transparent);
+		}
+
+		&:focus-visible {
+			outline: 2px solid var(--giving-day-primary);
+			outline-offset: 2px;
+		}
+	}
+
 	&__groups {
 		display: flex;
 		flex-direction: column;

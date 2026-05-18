@@ -35,13 +35,17 @@
     "extends @wordpress/browserslist-config"
   ],
   "scripts": {
-    "build": "npm-run-all --sequential build:blocks build:admin build:match",
+    "build": "npm-run-all --sequential build:blocks build:admin build:match build:team build:beneficiary",
     "build:blocks": "wp-scripts build --webpack-src-dir=blocks/src --output-path=blocks/build --webpack-copy-php",
     "build:admin": "wp-scripts build --webpack-src-dir=assets/admin-campaign --output-path=assets/build/admin-campaign",
     "build:match": "wp-scripts build --webpack-src-dir=assets/admin-match --output-path=assets/build/admin-match",
+    "build:team": "wp-scripts build --webpack-src-dir=assets/admin-team --output-path=assets/build/admin-team",
+    "build:beneficiary": "wp-scripts build --webpack-src-dir=assets/admin-beneficiary --output-path=assets/build/admin-beneficiary",
     "start": "wp-scripts start --webpack-src-dir=blocks/src --output-path=blocks/build --webpack-copy-php",
     "start:admin": "wp-scripts start --webpack-src-dir=assets/admin-campaign --output-path=assets/build/admin-campaign",
     "start:match": "wp-scripts start --webpack-src-dir=assets/admin-match --output-path=assets/build/admin-match",
+    "start:team": "wp-scripts start --webpack-src-dir=assets/admin-team --output-path=assets/build/admin-team",
+    "start:beneficiary": "wp-scripts start --webpack-src-dir=assets/admin-beneficiary --output-path=assets/build/admin-beneficiary",
     "format": "npm-run-all --sequential format:**",
     "format:scripts": "wp-scripts format blocks assets --no-error-on-unmatched-pattern",
     "format:styles": "npm run lint:styles -- --fix",

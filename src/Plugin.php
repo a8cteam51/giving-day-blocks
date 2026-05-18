@@ -12,12 +12,16 @@ use Team51\GivingDay\Admin\CampaignEditor;
 use Team51\GivingDay\Admin\CauseTermMeta;
 use Team51\GivingDay\Admin\Menu as AdminMenu;
 use Team51\GivingDay\Admin\MatchEditor;
+use Team51\GivingDay\Admin\BeneficiaryEditor;
+use Team51\GivingDay\Admin\ImportPage;
+use Team51\GivingDay\Admin\ImportShortcuts;
 use Team51\GivingDay\Admin\OfflineDonations as OfflineDonationsAdmin;
 use Team51\GivingDay\Admin\OrderAttributionBox;
 use Team51\GivingDay\Admin\ResultsExport;
 use Team51\GivingDay\Admin\ResultsPage;
 use Team51\GivingDay\Admin\ScreenIntro;
 use Team51\GivingDay\Admin\SettingsPage;
+use Team51\GivingDay\Admin\TeamEditor;
 use Team51\GivingDay\Data\Aggregator;
 use Team51\GivingDay\Data\Context;
 use Team51\GivingDay\Frontend\SingleTemplates;
@@ -245,6 +249,9 @@ final class Plugin {
 		$this->match_editor = new MatchEditor();
 		$this->match_editor->register();
 
+		( new TeamEditor() )->register();
+		( new BeneficiaryEditor() )->register();
+
 		Context::register_hooks();
 
 		$this->order_attribution = new OrderAttribution();
@@ -259,6 +266,9 @@ final class Plugin {
 
 		( new ResultsPage() )->register();
 		( new ResultsExport() )->register();
+
+		( new ImportPage() )->register();
+		( new ImportShortcuts() )->register();
 
 		( new CauseTermMeta() )->register();
 

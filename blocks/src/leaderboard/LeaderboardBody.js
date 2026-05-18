@@ -69,11 +69,14 @@ function SkeletonRows( { count, showAvatar } ) {
 export default function LeaderboardBody( {
 	rows = [],
 	groups = null,
+	total = 0,
 	currency = 'USD',
 	showAmount = true,
 	showAvatar = true,
 	loading = false,
 	skeletonCount = 5,
+	expanded = false,
+	onToggleExpand = null,
 } ) {
 	const listClass =
 		'giving-day-leaderboard__list' +
@@ -90,39 +93,72 @@ export default function LeaderboardBody( {
 		);
 	}
 
+	const flatRowCount = Array.isArray( rows ) ? rows.length : 0;
+	const flatTotal = Number.isFinite( total ) ? Number( total ) : flatRowCount;
+	const groupHasMore = Array.isArray( groups )
+		? groups.some( ( g ) => {
+				const groupTotal = Number.isFinite( g?.total )
+					? Number( g.total )
+					: Array.isArray( g?.rows )
+						? g.rows.length
+						: 0;
+				const groupCount = Array.isArray( g?.rows ) ? g.rows.length : 0;
+				return groupTotal > groupCount;
+			} )
+		: false;
+	const canExpand =
+		onToggleExpand !== null &&
+		( flatTotal > flatRowCount || groupHasMore );
+
+	const expandButton = canExpand ? (
+		<button
+			type="button"
+			className="giving-day-leaderboard__expand"
+			onClick={ onToggleExpand }
+			aria-expanded={ expanded ? 'true' : 'false' }
+		>
+			{ expanded
+				? __( 'Show less', 'giving-day-blocks' )
+				: __( 'Show all', 'giving-day-blocks' ) }
+		</button>
+	) : null;
+
 	if ( groups && Array.isArray( groups ) && groups.length > 0 ) {
 		return (
-			<div className="giving-day-leaderboard__groups">
-				{ groups.map( ( group ) => (
-					<section
-						key={ group.term?.id || group.term?.slug }
-						className="giving-day-leaderboard__group"
-					>
-						{ group.term?.name && (
-							<h3 className="giving-day-leaderboard__group-title">
-								{ group.term.name }
-							</h3>
-						) }
-						{ group.rows && group.rows.length > 0 ? (
-							<ol className={ listClass }>
-								{ group.rows.map( ( row ) => (
-									<Row
-										key={ `${ group.term?.id }-${ row.rank }-${ row.id }` }
-										row={ row }
-										showAmount={ showAmount }
-										showAvatar={ showAvatar }
-										currency={ currency }
-									/>
-								) ) }
-							</ol>
-						) : (
-							<p className="giving-day-leaderboard__empty">
-								{ __( 'No entries yet.', 'giving-day-blocks' ) }
-							</p>
-						) }
-					</section>
-				) ) }
-			</div>
+			<>
+				<div className="giving-day-leaderboard__groups">
+					{ groups.map( ( group ) => (
+						<section
+							key={ group.term?.id || group.term?.slug }
+							className="giving-day-leaderboard__group"
+						>
+							{ group.term?.name && (
+								<h3 className="giving-day-leaderboard__group-title">
+									{ group.term.name }
+								</h3>
+							) }
+							{ group.rows && group.rows.length > 0 ? (
+								<ol className={ listClass }>
+									{ group.rows.map( ( row ) => (
+										<Row
+											key={ `${ group.term?.id }-${ row.rank }-${ row.id }` }
+											row={ row }
+											showAmount={ showAmount }
+											showAvatar={ showAvatar }
+											currency={ currency }
+										/>
+									) ) }
+								</ol>
+							) : (
+								<p className="giving-day-leaderboard__empty">
+									{ __( 'No entries yet.', 'giving-day-blocks' ) }
+								</p>
+							) }
+						</section>
+					) ) }
+				</div>
+				{ expandButton }
+			</>
 		);
 	}
 
@@ -135,16 +171,19 @@ export default function LeaderboardBody( {
 	}
 
 	return (
-		<ol className={ `${ listClass }` } aria-live="polite">
-			{ rows.map( ( row ) => (
-				<Row
-					key={ `${ row.rank }-${ row.id }` }
-					row={ row }
-					showAmount={ showAmount }
-					showAvatar={ showAvatar }
-					currency={ currency }
-				/>
-			) ) }
-		</ol>
+		<>
+			<ol className={ `${ listClass }` } aria-live="polite">
+				{ rows.map( ( row ) => (
+					<Row
+						key={ `${ row.rank }-${ row.id }` }
+						row={ row }
+						showAmount={ showAmount }
+						showAvatar={ showAvatar }
+						currency={ currency }
+					/>
+				) ) }
+			</ol>
+			{ expandButton }
+		</>
 	);
 }
