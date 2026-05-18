@@ -14,6 +14,8 @@ use Team51\GivingDay\Admin\Menu as AdminMenu;
 use Team51\GivingDay\Admin\MatchEditor;
 use Team51\GivingDay\Admin\OfflineDonations as OfflineDonationsAdmin;
 use Team51\GivingDay\Admin\OrderAttributionBox;
+use Team51\GivingDay\Admin\ResultsExport;
+use Team51\GivingDay\Admin\ResultsPage;
 use Team51\GivingDay\Admin\ScreenIntro;
 use Team51\GivingDay\Admin\SettingsPage;
 use Team51\GivingDay\Data\Aggregator;
@@ -27,6 +29,7 @@ use Team51\GivingDay\PostTypes\Campaign;
 use Team51\GivingDay\PostTypes\Challenge;
 use Team51\GivingDay\PostTypes\GivingMatch;
 use Team51\GivingDay\PostTypes\Team;
+use Team51\GivingDay\Services\ResultsSnapshot;
 use Team51\GivingDay\Setup\MockData;
 use Team51\GivingDay\Taxonomies\Cause;
 use Team51\GivingDay\Taxonomies\TeamGroup;
@@ -254,9 +257,13 @@ final class Plugin {
 
 		( new OfflineDonationsAdmin() )->register();
 
+		( new ResultsPage() )->register();
+		( new ResultsExport() )->register();
+
 		( new CauseTermMeta() )->register();
 
 		Aggregator::register_hooks();
+		ResultsSnapshot::register_hooks();
 
 		add_action( 'init', array( $this, 'maybe_flush_rewrite_rules' ), 1000 );
 		add_action( 'init', array( $this, 'maybe_purge_legacy_overrides' ), 1001 );

@@ -125,7 +125,7 @@ final class REST {
 		$leaderboard_args = array_merge(
 			$args,
 			array(
-				'dimension' => array(
+				'dimension'               => array(
 					'description' => __( 'Leaderboard dimension.', 'giving-day-blocks' ),
 					'type'        => 'string',
 					'required'    => true,
@@ -136,24 +136,24 @@ final class REST {
 						Leaderboard::DIMENSION_CAUSES,
 					),
 				),
-				'limit' => array(
+				'limit'                   => array(
 					'description' => __( 'Maximum rows per list (1–100).', 'giving-day-blocks' ),
 					'type'        => 'integer',
 					'default'     => 10,
 					'minimum'     => 1,
 					'maximum'     => 100,
 				),
-			'filter_term_id' => array(
-				'description' => __( 'Optional team group or cause term ID to narrow results.', 'giving-day-blocks' ),
-				'type'        => 'integer',
-				'default'     => 0,
-			),
-			'group_by_parent_term_id' => array(
-				'description' => __( 'Optional parent team group term ID; returns one sub-list per child term.', 'giving-day-blocks' ),
-				'type'        => 'integer',
-				'default'     => 0,
-			),
-				'anonymize' => array(
+				'filter_term_id'          => array(
+					'description' => __( 'Optional team group or cause term ID to narrow results.', 'giving-day-blocks' ),
+					'type'        => 'integer',
+					'default'     => 0,
+				),
+				'group_by_parent_term_id' => array(
+					'description' => __( 'Optional parent team group term ID; returns one sub-list per child term.', 'giving-day-blocks' ),
+					'type'        => 'integer',
+					'default'     => 0,
+				),
+				'anonymize'               => array(
 					'description' => __( 'When true, donor names and avatars are redacted for top_donors.', 'giving-day-blocks' ),
 					'type'        => 'boolean',
 					'default'     => false,
@@ -200,6 +200,17 @@ final class REST {
 				'permission_callback' => array( $this, 'check_campaign_edit' ),
 				'args'                => array( 'id' => $args['id'] ),
 				'callback'            => array( $this, 'get_campaign_setup' ),
+			)
+		);
+
+		register_rest_route(
+			self::NAMESPACE,
+			'/campaign/(?P<id>\d+)/results',
+			array(
+				'methods'             => WP_REST_Server::READABLE,
+				'permission_callback' => array( $this, 'check_view_results' ),
+				'args'                => array( 'id' => $args['id'] ),
+				'callback'            => array( $this, 'get_campaign_results' ),
 			)
 		);
 
@@ -357,6 +368,24 @@ final class REST {
 	}
 
 	/**
+	 * Permission callback: requires `manage_woocommerce`. Used for the
+	 * post-event results endpoint which surfaces donor lists (display name
+	 * + amount, no email). Same cap the War Room and OrderAttribution box
+	 * gate on, so any user who can see WooCommerce order data already has
+	 * everything this endpoint exposes.
+	 *
+	 * @param WP_REST_Request $request
+	 * @return bool|WP_Error
+	 */
+	public function check_view_results( WP_REST_Request $request ) {
+		unset( $request );
+		if ( ! current_user_can( 'manage_woocommerce' ) ) {
+			return new WP_Error( 'giving_day_forbidden_results', __( 'You cannot view campaign results.', 'giving-day-blocks' ), array( 'status' => 403 ) );
+		}
+		return true;
+	}
+
+	/**
 	 * Permission callback: requires `edit_post` on the campaign AND
 	 * `edit_products` capability for creating donation products.
 	 *
@@ -427,20 +456,20 @@ final class REST {
 		$percent  = $goal > 0 ? max( 0, min( 100, ( $raised / $goal ) * 100 ) ) : 0;
 
 		$payload = array(
-			'id'            => $campaign_id,
-			'title'         => get_the_title( $campaign_id ),
-			'status'        => $status,
-			'goal'          => $goal,
-			'raised'        => $raised,
-			'percent'       => round( $percent, 2 ),
-			'currency'      => $currency,
-			'donor_count'   => $donors,
+			'id'              => $campaign_id,
+			'title'           => get_the_title( $campaign_id ),
+			'status'          => $status,
+			'goal'            => $goal,
+			'raised'          => $raised,
+			'percent'         => round( $percent, 2 ),
+			'currency'        => $currency,
+			'donor_count'     => $donors,
 			'pre_event_start' => (string) get_post_meta( $campaign_id, Campaign::META_PRE_EVENT_START, true ),
-			'start'         => (string) get_post_meta( $campaign_id, Campaign::META_START_DATETIME, true ),
-			'end'           => (string) get_post_meta( $campaign_id, Campaign::META_END_DATETIME, true ),
-			'timezone'      => (string) get_post_meta( $campaign_id, Campaign::META_TIMEZONE, true ),
-			'colors'        => Colors::for_campaign( $campaign_id ),
-			'server_time'   => gmdate( 'c' ),
+			'start'           => (string) get_post_meta( $campaign_id, Campaign::META_START_DATETIME, true ),
+			'end'             => (string) get_post_meta( $campaign_id, Campaign::META_END_DATETIME, true ),
+			'timezone'        => (string) get_post_meta( $campaign_id, Campaign::META_TIMEZONE, true ),
+			'colors'          => Colors::for_campaign( $campaign_id ),
+			'server_time'     => gmdate( 'c' ),
 		);
 
 		return $this->respond( $payload );
@@ -516,8 +545,8 @@ final class REST {
 		}
 
 		$args = array(
-			'filter_term_id'            => (int) $request->get_param( 'filter_term_id' ),
-			'group_by_parent_term_id'   => (int) $request->get_param( 'group_by_parent_term_id' ),
+			'filter_term_id'          => (int) $request->get_param( 'filter_term_id' ),
+			'group_by_parent_term_id' => (int) $request->get_param( 'group_by_parent_term_id' ),
 		);
 
 		$preview = $this->preview_override_from_request( $request );
@@ -566,7 +595,7 @@ final class REST {
 	 */
 	public function get_team_groups( WP_REST_Request $request ) {
 		$campaign_id = (int) $request['id'];
-		$readable = $this->locate_readable_campaign( $campaign_id );
+		$readable    = $this->locate_readable_campaign( $campaign_id );
 		if ( is_wp_error( $readable ) ) {
 			return $readable;
 		}
@@ -632,6 +661,31 @@ final class REST {
 				'server_time' => gmdate( 'c' ),
 			)
 		);
+	}
+
+	/**
+	 * GET /campaign/{id}/results — full post-event payload.
+	 *
+	 * Returns {@see Aggregator::results_for_campaign()} which is either the
+	 * frozen snapshot (with adjustments layered on a `current` block) or
+	 * the live computation when no snapshot exists yet. Gated by
+	 * `manage_woocommerce` because the response includes donor display
+	 * names (no email).
+	 *
+	 * @param WP_REST_Request $request
+	 * @return WP_REST_Response|WP_Error
+	 */
+	public function get_campaign_results( WP_REST_Request $request ) {
+		$campaign_id = (int) $request['id'];
+		if ( Campaign::POST_TYPE !== get_post_type( $campaign_id ) ) {
+			return new WP_Error(
+				'giving_day_blocks_campaign_not_found',
+				__( 'Campaign not found.', 'giving-day-blocks' ),
+				array( 'status' => 404 )
+			);
+		}
+
+		return $this->respond( Aggregator::results_for_campaign( $campaign_id ) );
 	}
 
 	/**
@@ -746,8 +800,8 @@ final class REST {
 	/**
 	 * Walks a parent → child-IDs map to collect every descendant of a term.
 	 *
-	 * @param int                $term_id   Term whose descendants to collect.
-	 * @param array<int,int[]>   $by_parent Parent term ID → list of child term IDs.
+	 * @param int              $term_id   Term whose descendants to collect.
+	 * @param array<int,int[]> $by_parent Parent term ID → list of child term IDs.
 	 * @return int[]
 	 */
 	private static function collect_descendant_term_ids( int $term_id, array $by_parent ): array {
@@ -865,7 +919,7 @@ final class REST {
 		if ( array_key_exists( 'team_id', $params ) ) {
 			$candidate = absint( $params['team_id'] );
 			if ( $candidate > 0 ) {
-				$post = get_post( $candidate );
+				$post    = get_post( $candidate );
 				$team_id = ( $post instanceof WP_Post && \Team51\GivingDay\PostTypes\Team::POST_TYPE === $post->post_type && 'publish' === $post->post_status )
 					? $candidate
 					: $team_id;
@@ -877,7 +931,7 @@ final class REST {
 		if ( array_key_exists( 'beneficiary_id', $params ) ) {
 			$candidate = absint( $params['beneficiary_id'] );
 			if ( $candidate > 0 ) {
-				$post = get_post( $candidate );
+				$post        = get_post( $candidate );
 				$beneficiary = ( $post instanceof WP_Post && Beneficiary::POST_TYPE === $post->post_type && 'publish' === $post->post_status )
 					? $candidate
 					: $beneficiary;

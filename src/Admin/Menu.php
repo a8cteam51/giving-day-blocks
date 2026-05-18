@@ -64,6 +64,7 @@ final class Menu {
 			'edit.php?post_type=' . GivingMatch::POST_TYPE,
 			'edit.php?post_type=' . Challenge::POST_TYPE,
 			OfflineDonations::PAGE_SLUG,
+			ResultsPage::PAGE_SLUG,
 			SettingsPage::PAGE_SLUG,
 		);
 
