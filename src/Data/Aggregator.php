@@ -55,6 +55,40 @@ final class Aggregator {
 	private const TOTALS_TRANSIENT_PREFIX = 'gd_totals_';
 
 	/**
+	 * Campaign post_meta key holding the frozen post-event results snapshot.
+	 *
+	 * Written by {@see self::snapshot_campaign()} once an event has ended and
+	 * the configured grace window has passed. The payload is a JSON-encodable
+	 * array containing campaign-wide totals, per-beneficiary totals + donor
+	 * lists, and per-team totals + donor lists — see the method's docblock.
+	 *
+	 * Existence of this meta flips read paths to "frozen at snapshot time +
+	 * adjustments" semantics (PLAN.md § Phase 11).
+	 */
+	public const META_RESULTS_SNAPSHOT = '_giving_results_snapshot';
+
+	/**
+	 * Campaign post_meta key holding the append-only adjustments log written
+	 * after the snapshot is taken. Each entry captures a delta to a single
+	 * beneficiary / team / campaign-wide total — see
+	 * {@see self::record_adjustment()} for the shape.
+	 *
+	 * The snapshot is never mutated in place; adjustments are layered on at
+	 * read time inside {@see self::apply_adjustments()}, so the snapshot
+	 * preserves the "as promised to the partner" total for audit.
+	 */
+	public const META_RESULTS_ADJUSTMENTS = '_giving_results_adjustments_log';
+
+	/**
+	 * Wildcard sentinel used for adjustments that affect *only* the
+	 * campaign-wide totals — e.g. a donation never tagged to a beneficiary
+	 * or team. Stored on the adjustment entry's `beneficiary_id` / `team_id`
+	 * to differentiate "applies to no specific entity" from "applies to
+	 * everything."
+	 */
+	public const ADJUSTMENT_ENTITY_NONE = 0;
+
+	/**
 	 * Order statuses that contribute to aggregates. Matches WooCommerce's
 	 * own "paid" set: `processing` and `completed`.
 	 */
@@ -146,6 +180,13 @@ final class Aggregator {
 	 * unique donors, currency. All values reflect real WC orders attributed
 	 * to the campaign and in a counting status.
 	 *
+	 * After {@see self::snapshot_campaign()} has run for the campaign, the
+	 * frozen `campaign` block from the snapshot is returned with any
+	 * post-snapshot adjustments applied. This means refunds, late offline
+	 * donations, and manual corrections recorded after the event do *not*
+	 * silently rewrite the promised total — the snapshot stays as-is and
+	 * adjustments are layered on read.
+	 *
 	 * Shape:
 	 *   array{
 	 *     campaign_id:   int,
@@ -162,6 +203,11 @@ final class Aggregator {
 	 * @return array<string, mixed>
 	 */
 	public static function totals_for_campaign( int $campaign_id, ?string $preview_override = null ): array {
+		$snapshot = self::read_snapshot( $campaign_id );
+		if ( null !== $snapshot ) {
+			return self::totals_from_snapshot( $campaign_id, $snapshot );
+		}
+
 		$ver = self::cache_version( $campaign_id );
 		$key = sprintf( '%s%d_%d', self::TOTALS_TRANSIENT_PREFIX, $ver, $campaign_id );
 
@@ -170,6 +216,22 @@ final class Aggregator {
 			return $cached;
 		}
 
+		$payload = self::compute_campaign_totals_live( $campaign_id );
+
+		set_transient( $key, $payload, self::cache_ttl_seconds( $campaign_id, $preview_override ) );
+
+		return $payload;
+	}
+
+	/**
+	 * Live (un-snapshotted) computation of campaign-wide totals. Extracted
+	 * from {@see self::totals_for_campaign()} so {@see self::snapshot_campaign()}
+	 * and the snapshot read path can share one implementation.
+	 *
+	 * @param int $campaign_id Campaign post ID.
+	 * @return array<string, mixed>
+	 */
+	private static function compute_campaign_totals_live( int $campaign_id ): array {
 		$raised     = 0.0;
 		$count      = 0;
 		$donor_keys = array();
@@ -191,7 +253,7 @@ final class Aggregator {
 		$currency_meta = (string) get_post_meta( $campaign_id, Campaign::META_CURRENCY, true );
 		$currency      = '' !== $currency_meta ? $currency_meta : (string) get_option( 'woocommerce_currency', 'USD' );
 
-		$payload = array(
+		return array(
 			'campaign_id'   => $campaign_id,
 			'raised'        => round( $raised, 2 ),
 			'count'         => $count,
@@ -200,10 +262,542 @@ final class Aggregator {
 			'currency'      => $currency,
 			'server_time'   => gmdate( 'c' ),
 		);
+	}
 
-		set_transient( $key, $payload, self::cache_ttl_seconds( $campaign_id, $preview_override ) );
+	/**
+	 * Reads the frozen results snapshot for a campaign, or null when one
+	 * has not been recorded yet.
+	 *
+	 * @param int $campaign_id Campaign post ID.
+	 * @return array<string, mixed>|null
+	 */
+	public static function read_snapshot( int $campaign_id ): ?array {
+		if ( $campaign_id <= 0 ) {
+			return null;
+		}
+		$raw = get_post_meta( $campaign_id, self::META_RESULTS_SNAPSHOT, true );
+		if ( ! is_array( $raw ) || empty( $raw ) ) {
+			return null;
+		}
+		return $raw;
+	}
+
+	/**
+	 * Reads the append-only adjustments log for a campaign.
+	 *
+	 * Each adjustment is stored as its own non-unique post_meta row so
+	 * concurrent writes via {@see self::record_adjustment()} can't race
+	 * — two simultaneous handlers (e.g. a refund + a late offline donation
+	 * landing in the same request cycle) both `INSERT` and neither
+	 * clobbers the other. WP unserializes each value, so
+	 * `get_post_meta( …, false )` returns a flat list of adjustment arrays
+	 * in insertion (meta_id) order, which is also the chronological order
+	 * the admin breakdown displays.
+	 *
+	 * @param int $campaign_id Campaign post ID.
+	 * @return array<int, array<string, mixed>>
+	 */
+	public static function read_adjustments( int $campaign_id ): array {
+		if ( $campaign_id <= 0 ) {
+			return array();
+		}
+		$raw = get_post_meta( $campaign_id, self::META_RESULTS_ADJUSTMENTS, false );
+		if ( ! is_array( $raw ) ) {
+			return array();
+		}
+		return array_values( array_filter( $raw, 'is_array' ) );
+	}
+
+	/**
+	 * Returns true when the campaign has been snapshotted.
+	 *
+	 * @param int $campaign_id Campaign post ID.
+	 */
+	public static function has_snapshot( int $campaign_id ): bool {
+		return null !== self::read_snapshot( $campaign_id );
+	}
+
+	/**
+	 * Computes and persists the per-campaign post-event results snapshot.
+	 *
+	 * Iterates every attributed order in the campaign once and produces:
+	 *
+	 *   - Campaign-wide totals: raised, count, avg, unique_donors.
+	 *   - Per-beneficiary buckets: raised, donor count, average gift, donor list
+	 *     (display name + amount + order_date; anonymous when the order carries
+	 *     `_wpcomsp_donation_anonymous = 'yes'`).
+	 *   - Per-team buckets: same shape as beneficiaries.
+	 *
+	 * Idempotent: when a snapshot already exists, returns it unchanged unless
+	 * `$force` is true (used by the "Re-snapshot from live data" admin action,
+	 * which also writes a `manual_correction` adjustment log entry capturing
+	 * the deltas — handled by the caller).
+	 *
+	 * @param int  $campaign_id Campaign post ID.
+	 * @param bool $force       When true, overwrites an existing snapshot.
+	 * @return array<string, mixed>|null Snapshot payload on success; null when the campaign does not exist.
+	 */
+	public static function snapshot_campaign( int $campaign_id, bool $force = false ): ?array {
+		if ( $campaign_id <= 0 || Campaign::POST_TYPE !== get_post_type( $campaign_id ) ) {
+			return null;
+		}
+
+		$existing = self::read_snapshot( $campaign_id );
+		if ( null !== $existing && ! $force ) {
+			return $existing;
+		}
+
+		$raised     = 0.0;
+		$count      = 0;
+		$donor_keys = array();
+
+		$beneficiaries = array();
+		$teams         = array();
+
+		foreach ( self::each_attributed_order( $campaign_id ) as $order ) {
+			$donation_total = self::donation_total_for_order( $order );
+			if ( $donation_total <= 0 ) {
+				continue;
+			}
+
+			$raised += $donation_total;
+			++$count;
+
+			$donor_key = self::donor_key_for_order( $order );
+			if ( null !== $donor_key ) {
+				$donor_keys[ $donor_key ] = true;
+			}
+
+			$beneficiary_id = (int) $order->get_meta( OrderAttribution::META_BENEFICIARY_ID );
+			$team_id        = (int) $order->get_meta( OrderAttribution::META_TEAM_ID );
+
+			$donor_entry = self::build_donor_list_entry( $order, $donation_total );
+
+			// Always bucket the donation, even when the donor never picked a
+			// Beneficiary / Team — the unassigned bucket (id=0) makes the
+			// per-entity totals add up to the campaign total. Without it the
+			// breakdown silently drops residual donations.
+			self::accumulate_entity_bucket( $beneficiaries, $beneficiary_id, $donation_total, $donor_key, $donor_entry );
+			self::accumulate_entity_bucket( $teams, $team_id, $donation_total, $donor_key, $donor_entry );
+		}
+
+		$currency_meta = (string) get_post_meta( $campaign_id, Campaign::META_CURRENCY, true );
+		$currency      = '' !== $currency_meta ? $currency_meta : (string) get_option( 'woocommerce_currency', 'USD' );
+		$now           = gmdate( 'c' );
+
+		$payload = array(
+			'snapshot_locked_at' => $now,
+			'server_time'        => $now,
+			'currency'           => $currency,
+			'campaign'           => array(
+				'campaign_id'   => $campaign_id,
+				'raised'        => round( $raised, 2 ),
+				'count'         => $count,
+				'avg'           => $count > 0 ? round( $raised / $count, 2 ) : 0.0,
+				'unique_donors' => count( $donor_keys ),
+				'currency'      => $currency,
+			),
+			'beneficiaries'      => self::finalize_entity_buckets( $beneficiaries ),
+			'teams'              => self::finalize_entity_buckets( $teams ),
+		);
+
+		update_post_meta( $campaign_id, self::META_RESULTS_SNAPSHOT, $payload );
+
+		// Snapshot reads bypass the transient layer, but downstream callers
+		// (e.g. Goal Progress blocks) keyed off the live cache also need to
+		// see the change immediately. Bumping the version is cheap insurance.
+		self::invalidate( $campaign_id );
 
 		return $payload;
+	}
+
+	/**
+	 * Appends an entry to the campaign's adjustments log. Entries are
+	 * applied on read by {@see self::apply_adjustments()} so the snapshot's
+	 * "as promised" total is preserved while current values reflect post-snapshot
+	 * activity (refunds, late offline donations, manual corrections).
+	 *
+	 * Recognized `type` values:
+	 *   - `refund`             — order moved out of a counting status after the snapshot.
+	 *   - `restore`            — refunded order returned to a counting status.
+	 *   - `offline_added`      — offline donation recorded after the snapshot.
+	 *   - `manual_correction`  — organizer-recorded correction (e.g. re-snapshot diff).
+	 *
+	 * @param int                 $campaign_id Campaign post ID.
+	 * @param array<string,mixed> $entry       Adjustment payload — must include `type`,
+	 *                                         `delta_amount`. Optional: `delta_count`,
+	 *                                         `beneficiary_id`, `team_id`, `reason`,
+	 *                                         `order_id`.
+	 */
+	public static function record_adjustment( int $campaign_id, array $entry ): void {
+		if ( $campaign_id <= 0 ) {
+			return;
+		}
+		if ( ! self::has_snapshot( $campaign_id ) ) {
+			// Adjustments only have meaning after a snapshot exists — before
+			// that, regular cache invalidation captures the change.
+			return;
+		}
+
+		$type = isset( $entry['type'] ) ? sanitize_key( (string) $entry['type'] ) : '';
+		if ( '' === $type ) {
+			return;
+		}
+
+		$normalized = array(
+			'at'             => gmdate( 'c' ),
+			'type'           => $type,
+			'delta_amount'   => isset( $entry['delta_amount'] ) ? round( (float) $entry['delta_amount'], 2 ) : 0.0,
+			'delta_count'    => isset( $entry['delta_count'] ) ? (int) $entry['delta_count'] : 0,
+			'beneficiary_id' => isset( $entry['beneficiary_id'] ) ? absint( $entry['beneficiary_id'] ) : self::ADJUSTMENT_ENTITY_NONE,
+			'team_id'        => isset( $entry['team_id'] ) ? absint( $entry['team_id'] ) : self::ADJUSTMENT_ENTITY_NONE,
+			'order_id'       => isset( $entry['order_id'] ) ? absint( $entry['order_id'] ) : 0,
+			'reason'         => isset( $entry['reason'] ) ? sanitize_text_field( (string) $entry['reason'] ) : '',
+		);
+
+		// Atomic append as a non-unique meta row. The previous read-modify-write
+		// of a single serialized array could lose entries when two adjustment
+		// handlers (e.g. a refund + a late offline donation) ran concurrently:
+		// both would read the same prior log, push their entry, and the second
+		// write would clobber the first. add_post_meta is a single INSERT,
+		// so concurrent writers all land.
+		add_post_meta( $campaign_id, self::META_RESULTS_ADJUSTMENTS, $normalized, false );
+
+		// Force a fresh read on the next totals lookup; transients holding
+		// pre-adjustment numbers must not win.
+		self::invalidate( $campaign_id );
+	}
+
+	/**
+	 * Returns the full results payload for a campaign: campaign totals,
+	 * per-beneficiary breakdown (with donor list), per-team breakdown.
+	 *
+	 * When a snapshot is present, the snapshot is returned with adjustments
+	 * applied to totals (donor lists are never rewritten — they reflect the
+	 * snapshot moment, with adjustments visible as a separate audit log).
+	 * Otherwise the payload is computed live by running
+	 * {@see self::snapshot_campaign()} *without persisting it* so callers
+	 * (admin breakdown screen, CSV export, REST) always have a consistent
+	 * shape regardless of snapshot state.
+	 *
+	 * @param int $campaign_id Campaign post ID.
+	 * @return array<string, mixed>
+	 */
+	public static function results_for_campaign( int $campaign_id ): array {
+		$snapshot = self::read_snapshot( $campaign_id );
+		if ( null !== $snapshot ) {
+			$snapshot['adjustments'] = self::read_adjustments( $campaign_id );
+			$snapshot['current']     = array(
+				'campaign'      => self::totals_from_snapshot( $campaign_id, $snapshot ),
+				'beneficiaries' => self::apply_entity_adjustments( $snapshot['beneficiaries'] ?? array(), $snapshot['adjustments'], 'beneficiary_id' ),
+				'teams'         => self::apply_entity_adjustments( $snapshot['teams'] ?? array(), $snapshot['adjustments'], 'team_id' ),
+			);
+			$snapshot['server_time'] = gmdate( 'c' );
+			return $snapshot;
+		}
+
+		return self::compute_results_live( $campaign_id );
+	}
+
+	/**
+	 * Live (un-snapshotted) full results payload. Identical shape to a
+	 * snapshot so consumers can treat both the same.
+	 *
+	 * @param int $campaign_id Campaign post ID.
+	 * @return array<string, mixed>
+	 */
+	private static function compute_results_live( int $campaign_id ): array {
+		$raised     = 0.0;
+		$count      = 0;
+		$donor_keys = array();
+
+		$beneficiaries = array();
+		$teams         = array();
+
+		foreach ( self::each_attributed_order( $campaign_id ) as $order ) {
+			$donation_total = self::donation_total_for_order( $order );
+			if ( $donation_total <= 0 ) {
+				continue;
+			}
+			$raised += $donation_total;
+			++$count;
+
+			$donor_key = self::donor_key_for_order( $order );
+			if ( null !== $donor_key ) {
+				$donor_keys[ $donor_key ] = true;
+			}
+
+			$beneficiary_id = (int) $order->get_meta( OrderAttribution::META_BENEFICIARY_ID );
+			$team_id        = (int) $order->get_meta( OrderAttribution::META_TEAM_ID );
+
+			$donor_entry = self::build_donor_list_entry( $order, $donation_total );
+
+			// id=0 = "Unassigned" — keeps the per-entity totals adding up to
+			// the campaign total instead of silently dropping residuals.
+			self::accumulate_entity_bucket( $beneficiaries, $beneficiary_id, $donation_total, $donor_key, $donor_entry );
+			self::accumulate_entity_bucket( $teams, $team_id, $donation_total, $donor_key, $donor_entry );
+		}
+
+		$currency_meta = (string) get_post_meta( $campaign_id, Campaign::META_CURRENCY, true );
+		$currency      = '' !== $currency_meta ? $currency_meta : (string) get_option( 'woocommerce_currency', 'USD' );
+		$now           = gmdate( 'c' );
+
+		return array(
+			'snapshot_locked_at' => null,
+			'server_time'        => $now,
+			'currency'           => $currency,
+			'campaign'           => array(
+				'campaign_id'   => $campaign_id,
+				'raised'        => round( $raised, 2 ),
+				'count'         => $count,
+				'avg'           => $count > 0 ? round( $raised / $count, 2 ) : 0.0,
+				'unique_donors' => count( $donor_keys ),
+				'currency'      => $currency,
+			),
+			'beneficiaries'      => self::finalize_entity_buckets( $beneficiaries ),
+			'teams'              => self::finalize_entity_buckets( $teams ),
+			'adjustments'        => array(),
+			'current'            => null,
+		);
+	}
+
+	/**
+	 * Builds the per-donor row that goes into a beneficiary's or team's donor
+	 * list. Display name is `{First} {L}.` unless the order is flagged
+	 * anonymous via `_wpcomsp_donation_anonymous = 'yes'` (the meta key
+	 * team51-donations already writes), in which case the donor renders as
+	 * "Anonymous" and no name fields are stored.
+	 *
+	 * Email addresses are never stored in the snapshot or returned here.
+	 *
+	 * @param WC_Order $order   The donation order.
+	 * @param float    $amount  Donation portion of the order total.
+	 * @return array<string, mixed>
+	 */
+	private static function build_donor_list_entry( WC_Order $order, float $amount ): array {
+		$is_anonymous = 'yes' === (string) $order->get_meta( '_wpcomsp_donation_anonymous' );
+		$created      = $order->get_date_created();
+		$created_iso  = $created instanceof \WC_DateTime ? $created->date( 'c' ) : '';
+
+		if ( $is_anonymous ) {
+			return array(
+				'order_id'     => $order->get_id(),
+				'display_name' => __( 'Anonymous', 'giving-day-blocks' ),
+				'anonymous'    => true,
+				'amount'       => round( $amount, 2 ),
+				'order_date'   => $created_iso,
+			);
+		}
+
+		$first        = trim( (string) $order->get_billing_first_name() );
+		$last         = trim( (string) $order->get_billing_last_name() );
+		$last_initial = '' !== $last ? mb_substr( $last, 0, 1 ) : '';
+
+		if ( '' === $first && '' === $last ) {
+			$display = __( 'Donor', 'giving-day-blocks' );
+		} elseif ( '' === $last_initial ) {
+			$display = $first;
+		} else {
+			$display = sprintf( '%s %s.', $first, $last_initial );
+		}
+
+		return array(
+			'order_id'     => $order->get_id(),
+			'display_name' => $display,
+			'anonymous'    => false,
+			'amount'       => round( $amount, 2 ),
+			'order_date'   => $created_iso,
+		);
+	}
+
+	/**
+	 * Accumulates one order's contribution into a per-entity bucket
+	 * (beneficiary or team). Buckets are keyed by entity ID and carry a
+	 * running raised total, donor-key set, and donor list.
+	 *
+	 * @param array<int, array<string,mixed>> $buckets    Mutable bucket map keyed by entity ID.
+	 * @param int                             $entity_id  Beneficiary or Team post ID.
+	 * @param float                           $amount     Donation amount.
+	 * @param string|null                     $donor_key  Result of donor_key_for_order, used for unique-donor count.
+	 * @param array<string,mixed>             $donor_row  One row for the donor list.
+	 */
+	private static function accumulate_entity_bucket( array &$buckets, int $entity_id, float $amount, ?string $donor_key, array $donor_row ): void {
+		if ( ! isset( $buckets[ $entity_id ] ) ) {
+			$buckets[ $entity_id ] = array(
+				'id'         => $entity_id,
+				'raised'     => 0.0,
+				'count'      => 0,
+				'donor_keys' => array(),
+				'donors'     => array(),
+			);
+		}
+		$buckets[ $entity_id ]['raised'] += $amount;
+		++$buckets[ $entity_id ]['count'];
+		if ( null !== $donor_key ) {
+			$buckets[ $entity_id ]['donor_keys'][ $donor_key ] = true;
+		}
+		$buckets[ $entity_id ]['donors'][] = $donor_row;
+	}
+
+	/**
+	 * Converts the working bucket map into the storage shape: title resolved,
+	 * donor list sorted by amount desc, unique_donors collapsed from the
+	 * working key map, donor_keys dropped.
+	 *
+	 * @param array<int, array<string,mixed>> $buckets Mutable bucket map keyed by entity ID.
+	 * @return array<int, array<string,mixed>>
+	 */
+	private static function finalize_entity_buckets( array $buckets ): array {
+		$out = array();
+		foreach ( $buckets as $entity_id => $bucket ) {
+			$donors = $bucket['donors'];
+			usort(
+				$donors,
+				static function ( $a, $b ) {
+					if ( ( $a['amount'] ?? 0 ) === ( $b['amount'] ?? 0 ) ) {
+						return 0;
+					}
+					return ( $b['amount'] ?? 0 ) <=> ( $a['amount'] ?? 0 );
+				}
+			);
+
+			$out[] = array(
+				'id'            => (int) $entity_id,
+				'title'         => self::entity_title( (int) $entity_id ),
+				'raised'        => round( (float) $bucket['raised'], 2 ),
+				'count'         => (int) $bucket['count'],
+				'avg'           => $bucket['count'] > 0 ? round( $bucket['raised'] / $bucket['count'], 2 ) : 0.0,
+				'unique_donors' => count( $bucket['donor_keys'] ),
+				'donors'        => $donors,
+			);
+		}
+
+		// Sort by amount desc; unassigned (id=0) always sinks to the bottom
+		// regardless of size so it never overshadows real beneficiaries / teams.
+		usort(
+			$out,
+			static function ( $a, $b ) {
+				$a_unassigned = 0 === (int) ( $a['id'] ?? 0 );
+				$b_unassigned = 0 === (int) ( $b['id'] ?? 0 );
+				if ( $a_unassigned !== $b_unassigned ) {
+					return $a_unassigned ? 1 : -1;
+				}
+				if ( $a['raised'] === $b['raised'] ) {
+					return strcmp( (string) $a['title'], (string) $b['title'] );
+				}
+				return $b['raised'] <=> $a['raised'];
+			}
+		);
+
+		return $out;
+	}
+
+	/**
+	 * Resolves the display title for an entity bucket. For id=0 (the
+	 * synthetic "Unassigned" bucket) we render a localized label rather
+	 * than calling `get_the_title(0)`, which would resolve to whatever
+	 * post happens to be in the loop and produce nonsense.
+	 *
+	 * @param int $entity_id Beneficiary / Team post ID, or 0 for the unassigned bucket.
+	 */
+	private static function entity_title( int $entity_id ): string {
+		if ( $entity_id <= 0 ) {
+			return __( 'Unassigned', 'giving-day-blocks' );
+		}
+		return (string) get_the_title( $entity_id );
+	}
+
+	/**
+	 * Returns the campaign-wide totals block with adjustments applied.
+	 *
+	 * @param int                 $campaign_id Campaign post ID.
+	 * @param array<string,mixed> $snapshot    Raw snapshot payload.
+	 * @return array<string,mixed>
+	 */
+	private static function totals_from_snapshot( int $campaign_id, array $snapshot ): array {
+		$campaign = isset( $snapshot['campaign'] ) && is_array( $snapshot['campaign'] ) ? $snapshot['campaign'] : array();
+
+		$adjustments  = self::read_adjustments( $campaign_id );
+		$delta_amount = 0.0;
+		$delta_count  = 0;
+		foreach ( $adjustments as $entry ) {
+			$delta_amount += isset( $entry['delta_amount'] ) ? (float) $entry['delta_amount'] : 0.0;
+			$delta_count  += isset( $entry['delta_count'] ) ? (int) $entry['delta_count'] : 0;
+		}
+
+		$raised = (float) ( $campaign['raised'] ?? 0 ) + $delta_amount;
+		$count  = (int) ( $campaign['count'] ?? 0 ) + $delta_count;
+
+		return array(
+			'campaign_id'   => $campaign_id,
+			'raised'        => round( $raised, 2 ),
+			'count'         => $count,
+			'avg'           => $count > 0 ? round( $raised / $count, 2 ) : 0.0,
+			'unique_donors' => (int) ( $campaign['unique_donors'] ?? 0 ),
+			'currency'      => (string) ( $campaign['currency'] ?? $snapshot['currency'] ?? '' ),
+			'server_time'   => gmdate( 'c' ),
+		);
+	}
+
+	/**
+	 * Layers per-entity adjustments on top of the frozen snapshot rows.
+	 * Returns rows whose `raised` and `count` reflect the snapshot total plus
+	 * any post-snapshot deltas attributed to that entity.
+	 *
+	 * @param list<array<string,mixed>> $rows        Snapshot rows for the entity type.
+	 * @param list<array<string,mixed>> $adjustments Adjustment log entries.
+	 * @param string                    $id_key      `beneficiary_id` or `team_id`.
+	 * @return list<array<string,mixed>>
+	 */
+	private static function apply_entity_adjustments( array $rows, array $adjustments, string $id_key ): array {
+		if ( empty( $adjustments ) ) {
+			return $rows;
+		}
+		$by_id = array();
+		foreach ( $rows as $row ) {
+			$by_id[ (int) ( $row['id'] ?? 0 ) ] = $row;
+		}
+		foreach ( $adjustments as $entry ) {
+			if ( ! array_key_exists( $id_key, $entry ) ) {
+				continue;
+			}
+			$entity_id = (int) $entry[ $id_key ];
+			if ( $entity_id < 0 ) {
+				continue;
+			}
+			if ( ! isset( $by_id[ $entity_id ] ) ) {
+				$by_id[ $entity_id ] = array(
+					'id'            => $entity_id,
+					'title'         => self::entity_title( $entity_id ),
+					'raised'        => 0.0,
+					'count'         => 0,
+					'avg'           => 0.0,
+					'unique_donors' => 0,
+					'donors'        => array(),
+				);
+			}
+			$by_id[ $entity_id ]['raised'] = round(
+				(float) ( $by_id[ $entity_id ]['raised'] ?? 0 ) + (float) ( $entry['delta_amount'] ?? 0 ),
+				2
+			);
+			$by_id[ $entity_id ]['count']  = (int) ( $by_id[ $entity_id ]['count'] ?? 0 ) + (int) ( $entry['delta_count'] ?? 0 );
+			$by_id[ $entity_id ]['avg']    = $by_id[ $entity_id ]['count'] > 0
+				? round( $by_id[ $entity_id ]['raised'] / $by_id[ $entity_id ]['count'], 2 )
+				: 0.0;
+		}
+		$out = array_values( $by_id );
+		usort(
+			$out,
+			static function ( $a, $b ) {
+				$a_unassigned = 0 === (int) ( $a['id'] ?? 0 );
+				$b_unassigned = 0 === (int) ( $b['id'] ?? 0 );
+				if ( $a_unassigned !== $b_unassigned ) {
+					return $a_unassigned ? 1 : -1;
+				}
+				return ( $b['raised'] ?? 0 ) <=> ( $a['raised'] ?? 0 );
+			}
+		);
+		return $out;
 	}
 
 	/**

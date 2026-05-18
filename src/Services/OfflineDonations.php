@@ -191,6 +191,17 @@ final class OfflineDonations {
 
 		Aggregator::invalidate( $campaign_id );
 
+		/**
+		 * Fires after an offline donation has been recorded as a WC order.
+		 *
+		 * Consumed by {@see ResultsSnapshot} to append an adjustment entry
+		 * when the donation lands after the campaign has been snapshotted.
+		 *
+		 * @param int $order_id    Newly created WC order ID.
+		 * @param int $campaign_id Campaign the donation was attributed to.
+		 */
+		do_action( 'giving_day_offline_donation_recorded', $order->get_id(), $campaign_id );
+
 		return $order->get_id();
 	}
 
