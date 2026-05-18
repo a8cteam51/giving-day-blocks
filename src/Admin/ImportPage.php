@@ -367,6 +367,17 @@ final class ImportPage {
 		}
 
 		if ( Importer::TYPE_DONATIONS === $type ) {
+			if ( 0 === count( (array) $rows ) ) {
+				$this->redirect_to_page(
+					$type,
+					array(
+						'gd_import'  => 'done',
+						'gd_created' => 0,
+						'gd_skipped' => 0,
+						'gd_errors'  => 0,
+					)
+				);
+			}
 			$key = $this->stash_job( $type, (array) $rows );
 			$this->redirect_to_page(
 				$type,
@@ -667,7 +678,7 @@ final class ImportPage {
 	 * @param array<int, array<string, string>> $rows Parsed CSV rows.
 	 */
 	private function stash_job( string $type, array $rows ): string {
-		$key     = wp_generate_password( 16, false, false );
+		$key     = sanitize_key( wp_generate_password( 16, false, false ) );
 		$payload = array(
 			'type'    => $type,
 			'rows'    => $rows,
@@ -697,7 +708,7 @@ final class ImportPage {
 	 * @param array<int, array<string,mixed>> $errors Error rows.
 	 */
 	private function stash_errors( array $errors ): string {
-		$key = wp_generate_password( 16, false, false );
+		$key = sanitize_key( wp_generate_password( 16, false, false ) );
 		set_transient( $this->errors_transient_key( $key ), $errors, self::ERRORS_TRANSIENT_TTL );
 		return $key;
 	}

@@ -115,12 +115,13 @@ function BeneficiaryDetailsPanel() {
 				value={ meta?.[ META_KEYS.goalAmount ] ?? 0 }
 				min={ 0 }
 				step={ 1 }
-				onChange={ ( value ) =>
+				onChange={ ( value ) => {
+					const parsed = parseFloat( value );
 					updateMeta(
 						META_KEYS.goalAmount,
-						value === '' ? 0 : Number( value )
-					)
-				}
+						Number.isFinite( parsed ) && parsed >= 0 ? parsed : 0
+					);
+				} }
 				__next40pxDefaultSize
 			/>
 

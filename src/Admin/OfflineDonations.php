@@ -71,10 +71,12 @@ final class OfflineDonations {
 		echo '<h1 class="wp-heading-inline">' . esc_html__( 'Offline Donations', 'giving-day-blocks' ) . '</h1>';
 
 		if ( 'new' !== $action ) {
-			$new_url    = add_query_arg( array( 'action' => 'new' ), self::page_url() );
-			$import_url = ImportPage::url_for_type( Importer::TYPE_DONATIONS );
+			$new_url = add_query_arg( array( 'action' => 'new' ), self::page_url() );
 			echo ' <a href="' . esc_url( $new_url ) . '" class="page-title-action">' . esc_html__( 'Add Donation', 'giving-day-blocks' ) . '</a>';
-			echo ' <a href="' . esc_url( $import_url ) . '" class="page-title-action">' . esc_html__( 'Import data', 'giving-day-blocks' ) . '</a>';
+			if ( current_user_can( ImportPage::REQUIRED_CAP ) ) {
+				$import_url = ImportPage::url_for_type( Importer::TYPE_DONATIONS );
+				echo ' <a href="' . esc_url( $import_url ) . '" class="page-title-action">' . esc_html__( 'Import data', 'giving-day-blocks' ) . '</a>';
+			}
 		}
 
 		echo '<hr class="wp-header-end" />';
