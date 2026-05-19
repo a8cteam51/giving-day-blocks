@@ -13,13 +13,81 @@
  * useCountUp, so a visitor opting out of motion always sees an instant
  * snap regardless of editor settings.
  */
-import { createRoot } from '@wordpress/element';
+import { useEffect, useRef, useState, createRoot } from '@wordpress/element';
+import apiFetch from '@wordpress/api-fetch';
 
 import { useCampaignStatus } from '../_shared/hooks/useCampaignStatus';
-import { useCampaignSummary } from '../_shared/hooks/useCampaignSummary';
 import { useCountUp } from '../_shared/hooks/useCountUp';
 import { formatCurrency, formatNumber } from '../_shared/utils/formatCurrency';
-import { clampPercent, computePercent } from '../_shared/utils/goalProgress';
+import { clampPercent, computePercent, goalProgressEndpoint } from '../_shared/utils/goalProgress';
+
+function useTargetSummary( path, options = {} ) {
+	const { intervalMs = 30000, initialData = null } = options;
+	const [ data, setData ] = useState( initialData );
+	const backoffRef = useRef( intervalMs );
+
+	useEffect( () => {
+		if ( ! path ) {
+			setData( null );
+			return undefined;
+		}
+		let cancelled = false;
+		let timerId = null;
+
+		const schedule = ( ms ) => {
+			if ( ! cancelled ) {
+				timerId = window.setTimeout( run, ms );
+			}
+		};
+
+		const run = async () => {
+			if ( cancelled || document.visibilityState === 'hidden' ) {
+				if ( ! cancelled ) {
+					schedule( intervalMs );
+				}
+				return;
+			}
+			try {
+				const payload = await apiFetch( { path } );
+				if ( ! cancelled ) {
+					setData( payload );
+					backoffRef.current = intervalMs;
+					schedule( intervalMs );
+				}
+			} catch ( _err ) {
+				if ( ! cancelled ) {
+					backoffRef.current = Math.min(
+						backoffRef.current * 2,
+						5 * 60 * 1000
+					);
+					schedule( backoffRef.current );
+				}
+			}
+		};
+
+		run();
+
+		const onVisibility = () => {
+			if ( document.visibilityState === 'visible' ) {
+				if ( timerId ) {
+					window.clearTimeout( timerId );
+				}
+				run();
+			}
+		};
+		document.addEventListener( 'visibilitychange', onVisibility );
+
+		return () => {
+			cancelled = true;
+			if ( timerId ) {
+				window.clearTimeout( timerId );
+			}
+			document.removeEventListener( 'visibilitychange', onVisibility );
+		};
+	}, [ path, intervalMs ] );
+
+	return { data };
+}
 
 function parseJSON( raw, fallback ) {
 	if ( ! raw ) {
@@ -34,7 +102,12 @@ function parseJSON( raw, fallback ) {
 }
 
 function GoalProgress( { root } ) {
-	const campaignId = Number( root.dataset.campaignId );
+	const targetType = root.dataset.targetType || 'campaign';
+	const targetIdRaw = root.dataset.targetId || root.dataset.campaignId || '0';
+	const targetId = parseInt( targetIdRaw, 10 );
+	const endpoint = goalProgressEndpoint( targetType, targetId );
+
+	const campaignId = targetType === 'campaign' ? targetId : 0;
 	const orientation =
 		root.dataset.orientation === 'vertical' ? 'vertical' : 'horizontal';
 	const animateBar = root.dataset.animateBar === '1';
@@ -50,8 +123,7 @@ function GoalProgress( { root } ) {
 	const initialData = parseJSON( root.dataset.initial, null );
 
 	const { status } = useCampaignStatus( campaignId );
-	const { data } = useCampaignSummary( campaignId, {
-		// Stay tight during the event, calmer when scheduled / ended.
+	const { data } = useTargetSummary( endpoint, {
 		intervalMs: status === 'live' ? 15000 : 60000,
 		initialData,
 	} );
@@ -196,7 +268,9 @@ function hydrate( root ) {
 
 function boot() {
 	document
-		.querySelectorAll( '.giving-day-goal-progress[data-campaign-id]' )
+		.querySelectorAll(
+			'.giving-day-goal-progress[data-target-id], .giving-day-goal-progress[data-campaign-id]'
+		)
 		.forEach( hydrate );
 }
 

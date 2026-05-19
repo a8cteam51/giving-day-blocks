@@ -2,6 +2,7 @@ import {
 	GOAL_TARGET_CAMPAIGN,
 	clampPercent,
 	computePercent,
+	goalProgressEndpoint,
 	summaryPathFor,
 	targetFromAttributes,
 } from '../../blocks/src/_shared/utils/goalProgress';
@@ -62,5 +63,27 @@ describe( 'computePercent', () => {
 	test( 'returns the raw percentage (uncapped)', () => {
 		expect( computePercent( 50, 100 ) ).toBe( 50 );
 		expect( computePercent( 150, 100 ) ).toBe( 150 );
+	} );
+} );
+
+describe( 'goalProgressEndpoint', () => {
+	it( 'builds the campaign endpoint by default', () => {
+		expect( goalProgressEndpoint( 'campaign', 12 ) ).toBe( '/wp-json/giving-day/v1/campaign/12/summary' );
+	} );
+
+	it( 'builds the team endpoint', () => {
+		expect( goalProgressEndpoint( 'team', 701 ) ).toBe( '/wp-json/giving-day/v1/team/701/summary' );
+	} );
+
+	it( 'builds the beneficiary endpoint', () => {
+		expect( goalProgressEndpoint( 'beneficiary', 612 ) ).toBe( '/wp-json/giving-day/v1/beneficiary/612/summary' );
+	} );
+
+	it( 'returns null for unknown type', () => {
+		expect( goalProgressEndpoint( 'unknown', 1 ) ).toBeNull();
+	} );
+
+	it( 'returns null when id is missing or zero', () => {
+		expect( goalProgressEndpoint( 'team', 0 ) ).toBeNull();
 	} );
 } );
