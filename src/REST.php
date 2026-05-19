@@ -20,6 +20,7 @@ namespace Team51\GivingDay;
 
 use Team51\GivingDay\Data\Aggregator;
 use Team51\GivingDay\Data\Colors;
+use Team51\GivingDay\Data\GoalProgress;
 use Team51\GivingDay\Data\Context;
 use Team51\GivingDay\Data\Leaderboard;
 use Team51\GivingDay\Data\MatchProgress;
@@ -88,6 +89,28 @@ final class REST {
 				'permission_callback' => '__return_true',
 				'args'                => $args,
 				'callback'            => array( $this, 'get_summary' ),
+			)
+		);
+
+		register_rest_route(
+			self::NAMESPACE,
+			'/team/(?P<id>\d+)/summary',
+			array(
+				'methods'             => WP_REST_Server::READABLE,
+				'permission_callback' => '__return_true',
+				'args'                => array( 'id' => $args['id'] ),
+				'callback'            => array( $this, 'team_summary' ),
+			)
+		);
+
+		register_rest_route(
+			self::NAMESPACE,
+			'/beneficiary/(?P<id>\d+)/summary',
+			array(
+				'methods'             => WP_REST_Server::READABLE,
+				'permission_callback' => '__return_true',
+				'args'                => array( 'id' => $args['id'] ),
+				'callback'            => array( $this, 'beneficiary_summary' ),
 			)
 		);
 
@@ -472,6 +495,38 @@ final class REST {
 			'server_time'     => gmdate( 'c' ),
 		);
 
+		return $this->respond( $payload );
+	}
+
+	/**
+	 * GET /team/{id}/summary
+	 *
+	 * @param WP_REST_Request $request
+	 * @return WP_REST_Response|WP_Error
+	 */
+	public function team_summary( WP_REST_Request $request ) {
+		$id      = (int) $request['id'];
+		$payload = GoalProgress::resolve( GoalProgress::TYPE_TEAM, $id );
+		if ( null === $payload ) {
+			return new WP_Error( 'not_found', __( 'Team not found.', 'giving-day-blocks' ), array( 'status' => 404 ) );
+		}
+		$payload['server_time'] = gmdate( 'c' );
+		return $this->respond( $payload );
+	}
+
+	/**
+	 * GET /beneficiary/{id}/summary
+	 *
+	 * @param WP_REST_Request $request
+	 * @return WP_REST_Response|WP_Error
+	 */
+	public function beneficiary_summary( WP_REST_Request $request ) {
+		$id      = (int) $request['id'];
+		$payload = GoalProgress::resolve( GoalProgress::TYPE_BENEFICIARY, $id );
+		if ( null === $payload ) {
+			return new WP_Error( 'not_found', __( 'Beneficiary not found.', 'giving-day-blocks' ), array( 'status' => 404 ) );
+		}
+		$payload['server_time'] = gmdate( 'c' );
 		return $this->respond( $payload );
 	}
 
