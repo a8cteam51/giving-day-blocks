@@ -3,6 +3,21 @@
  */
 import { __ } from '@wordpress/i18n';
 
+function dimensionLabel( dimension ) {
+	switch ( dimension ) {
+		case 'top_donors':
+			return __( 'Top donors', 'giving-day-blocks' );
+		case 'top_teams':
+			return __( 'Top teams', 'giving-day-blocks' );
+		case 'top_beneficiaries':
+			return __( 'Top beneficiaries / funds', 'giving-day-blocks' );
+		case 'top_causes':
+			return __( 'Top causes', 'giving-day-blocks' );
+		default:
+			return '';
+	}
+}
+
 function slugFromPanel( panel ) {
 	const slug = panel?.dataset?.tabSlug;
 	if ( slug && slug !== '' ) {
@@ -74,10 +89,15 @@ function initTabs( root ) {
 
 	panels.forEach( ( panel, index ) => {
 		const slug = slugFromPanel( panel );
-		const label =
+		const explicit =
 			panel.dataset.tabLabel && panel.dataset.tabLabel.trim() !== ''
 				? panel.dataset.tabLabel
-				: `${ __( 'Tab', 'giving-day-blocks' ) } ${ index + 1 }`;
+				: '';
+		const byDimension = dimensionLabel( panel.dataset.dimension );
+		const label =
+			explicit ||
+			byDimension ||
+			`${ __( 'Tab', 'giving-day-blocks' ) } ${ index + 1 }`;
 
 		const tabId = `gd-lb-tab-${
 			root.dataset.campaignId || '0'
