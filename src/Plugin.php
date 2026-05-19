@@ -35,6 +35,7 @@ use Team51\GivingDay\PostTypes\Challenge;
 use Team51\GivingDay\PostTypes\GivingMatch;
 use Team51\GivingDay\PostTypes\Team;
 use Team51\GivingDay\Services\ResultsSnapshot;
+use Team51\GivingDay\Setup\BlockTemplates;
 use Team51\GivingDay\Setup\MockData;
 use Team51\GivingDay\Taxonomies\Cause;
 use Team51\GivingDay\Taxonomies\TeamGroup;
@@ -274,6 +275,8 @@ final class Plugin {
 		( new CauseTermMeta() )->register();
 
 		( new DonationPageSetting() )->register();
+
+		( new BlockTemplates() )->register();
 
 		Aggregator::register_hooks();
 		ResultsSnapshot::register_hooks();

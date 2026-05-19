@@ -20,6 +20,30 @@ final class BlockTemplates {
 	}
 
 	public function register_templates(): void {
-		// Populated in Task 12.
+		if ( ! function_exists( 'register_block_template' ) ) {
+			return;
+		}
+
+		$dir = dirname( __DIR__, 2 ) . '/templates';
+
+		register_block_template(
+			'giving-day-blocks//single-team',
+			array(
+				'title'       => __( 'Single Team (Giving Day)', 'giving-day-blocks' ),
+				'description' => __( 'Default template for Team posts: title, goal, donate button, content.', 'giving-day-blocks' ),
+				'content'     => (string) file_get_contents( $dir . '/single-team.html' ),
+				'post_types'  => array( \Team51\GivingDay\PostTypes\Team::POST_TYPE ),
+			)
+		);
+
+		register_block_template(
+			'giving-day-blocks//single-beneficiary',
+			array(
+				'title'       => __( 'Single Beneficiary (Giving Day)', 'giving-day-blocks' ),
+				'description' => __( 'Default template for Beneficiary posts: title, goal, donate button, content.', 'giving-day-blocks' ),
+				'content'     => (string) file_get_contents( $dir . '/single-beneficiary.html' ),
+				'post_types'  => array( \Team51\GivingDay\PostTypes\Beneficiary::POST_TYPE ),
+			)
+		);
 	}
 }
