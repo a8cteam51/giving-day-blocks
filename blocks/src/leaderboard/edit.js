@@ -47,7 +47,13 @@ export default function Edit( { attributes, setAttributes, context } ) {
 		rawParent !== undefined && rawParent !== null ? Number( rawParent ) : 0;
 	const resolvedId = campaignId || parentCampaign || 0;
 
-	const { campaigns, campaign } = useSelect(
+	const dim = dimension || 'top_teams';
+	const filterTaxonomy =
+		dim === 'top_beneficiaries' || dim === 'top_causes'
+			? 'giving_cause'
+			: 'giving_team_group';
+
+	const { campaigns, campaign, filterTerms, groupParentTerms } = useSelect(
 		( select ) => {
 			const core = select( 'core' );
 			return {
@@ -64,9 +70,24 @@ export default function Edit( { attributes, setAttributes, context } ) {
 							resolvedId
 					  )
 					: null,
+				filterTerms:
+					core.getEntityRecords( 'taxonomy', filterTaxonomy, {
+						per_page: 100,
+						hide_empty: false,
+						orderby: 'name',
+						order: 'asc',
+					} ) || [],
+				groupParentTerms:
+					core.getEntityRecords( 'taxonomy', 'giving_team_group', {
+						per_page: 100,
+						hide_empty: false,
+						parent: 0,
+						orderby: 'name',
+						order: 'asc',
+					} ) || [],
 			};
 		},
-		[ resolvedId ]
+		[ resolvedId, filterTaxonomy ]
 	);
 
 	const campaignOptions = useMemo( () => {
@@ -84,6 +105,57 @@ export default function Edit( { attributes, setAttributes, context } ) {
 		} );
 		return opts;
 	}, [ campaigns ] );
+
+	const filterTermOptions = useMemo( () => {
+		const opts = [
+			{ label: __( '— No filter —', 'giving-day-blocks' ), value: 0 },
+		];
+		( filterTerms || [] ).forEach( ( t ) => {
+			opts.push( {
+				value: t.id,
+				label: t.parent ? `— ${ t.name }` : t.name,
+			} );
+		} );
+		// Surface a stale selection (e.g. after switching dimension) so the
+		// admin can see and clear it instead of silently dropping it.
+		if (
+			filterTermId &&
+			! ( filterTerms || [] ).some( ( t ) => t.id === filterTermId )
+		) {
+			opts.push( {
+				value: filterTermId,
+				label: `#${ filterTermId } (${ __(
+					'not in current taxonomy',
+					'giving-day-blocks'
+				) })`,
+			} );
+		}
+		return opts;
+	}, [ filterTerms, filterTermId ] );
+
+	const groupParentOptions = useMemo( () => {
+		const opts = [
+			{
+				label: __( '— No grouping —', 'giving-day-blocks' ),
+				value: 0,
+			},
+		];
+		( groupParentTerms || [] ).forEach( ( t ) => {
+			opts.push( { value: t.id, label: t.name } );
+		} );
+		if (
+			groupByParentTermId &&
+			! ( groupParentTerms || [] ).some(
+				( t ) => t.id === groupByParentTermId
+			)
+		) {
+			opts.push( {
+				value: groupByParentTermId,
+				label: `#${ groupByParentTermId }`,
+			} );
+		}
+		return opts;
+	}, [ groupParentTerms, groupByParentTermId ] );
 
 	const query = useMemo(
 		() => ( {
@@ -165,43 +237,46 @@ export default function Edit( { attributes, setAttributes, context } ) {
 						__next40pxDefaultSize
 						__nextHasNoMarginBottom
 					/>
-					<TextControl
-						label={ __(
-							'Filter term ID (team group or cause)',
-							'giving-day-blocks'
-						) }
-						type="number"
-						value={ filterTermId ? String( filterTermId ) : '' }
+					<SelectControl
+						label={
+							filterTaxonomy === 'giving_cause'
+								? __(
+										'Filter by cause',
+										'giving-day-blocks'
+								  )
+								: __(
+										'Filter by team group',
+										'giving-day-blocks'
+								  )
+						}
+						value={ filterTermId || 0 }
+						options={ filterTermOptions }
 						onChange={ ( v ) =>
 							setAttributes( {
 								filterTermId: parseInt( v, 10 ) || 0,
 							} )
 						}
 						help={ __(
-							'Optional. Narrows teams or beneficiaries / funds to one taxonomy term.',
+							'Optional. Narrows results to one taxonomy term (or its descendants).',
 							'giving-day-blocks'
 						) }
 						__next40pxDefaultSize
 						__nextHasNoMarginBottom
 					/>
-					<TextControl
+					<SelectControl
 						label={ __(
-							'Group by parent team group (term ID)',
+							'Group by team group',
 							'giving-day-blocks'
 						) }
-						type="number"
-						value={
-							groupByParentTermId
-								? String( groupByParentTermId )
-								: ''
-						}
+						value={ groupByParentTermId || 0 }
+						options={ groupParentOptions }
 						onChange={ ( v ) =>
 							setAttributes( {
 								groupByParentTermId: parseInt( v, 10 ) || 0,
 							} )
 						}
 						help={ __(
-							'Optional. Renders one sub-list per child of this parent term (best with Top teams).',
+							'Optional. Renders one sub-list per child of the chosen parent (best with Top teams).',
 							'giving-day-blocks'
 						) }
 						__next40pxDefaultSize
@@ -212,6 +287,22 @@ export default function Edit( { attributes, setAttributes, context } ) {
 					title={ __( 'Display', 'giving-day-blocks' ) }
 					initialOpen={ false }
 				>
+					<TextControl
+						label={ __(
+							'Tab label (when inside Leaderboard Tabs)',
+							'giving-day-blocks'
+						) }
+						value={ tabLabel || '' }
+						onChange={ ( v ) =>
+							setAttributes( { tabLabel: v || '' } )
+						}
+						help={ __(
+							'Leave blank to fall back to the dimension name (e.g. "Top teams").',
+							'giving-day-blocks'
+						) }
+						__next40pxDefaultSize
+						__nextHasNoMarginBottom
+					/>
 					<ToggleControl
 						label={ __( 'Show amounts', 'giving-day-blocks' ) }
 						checked={ !! showAmount }
@@ -249,23 +340,6 @@ export default function Edit( { attributes, setAttributes, context } ) {
 						}
 						min={ 5 }
 						max={ 300 }
-						__next40pxDefaultSize
-						__nextHasNoMarginBottom
-					/>
-				</PanelBody>
-				<PanelBody
-					title={ __( 'Tabs container', 'giving-day-blocks' ) }
-					initialOpen={ false }
-				>
-					<TextControl
-						label={ __(
-							'Tab label (inside Leaderboard Tabs)',
-							'giving-day-blocks'
-						) }
-						value={ tabLabel || '' }
-						onChange={ ( v ) =>
-							setAttributes( { tabLabel: v || '' } )
-						}
 						__next40pxDefaultSize
 						__nextHasNoMarginBottom
 					/>
