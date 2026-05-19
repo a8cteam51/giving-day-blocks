@@ -9,6 +9,7 @@
 namespace Team51\GivingDay;
 
 use Team51\GivingDay\Admin\CampaignEditor;
+use Team51\GivingDay\Admin\DonationPageSetting;
 use Team51\GivingDay\Admin\CauseTermMeta;
 use Team51\GivingDay\Admin\Menu as AdminMenu;
 use Team51\GivingDay\Admin\MatchEditor;
@@ -271,6 +272,8 @@ final class Plugin {
 		( new ImportShortcuts() )->register();
 
 		( new CauseTermMeta() )->register();
+
+		( new DonationPageSetting() )->register();
 
 		Aggregator::register_hooks();
 		ResultsSnapshot::register_hooks();
