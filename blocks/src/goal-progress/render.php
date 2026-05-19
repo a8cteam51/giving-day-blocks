@@ -18,15 +18,52 @@ use Team51\GivingDay\Data\GoalProgress;
 
 defined( 'ABSPATH' ) || exit;
 
-$campaign_id = isset( $attributes['campaignId'] ) ? (int) $attributes['campaignId'] : 0;
-if ( $campaign_id <= 0 ) {
+$target_type = isset( $attributes['targetType'] ) ? (string) $attributes['targetType'] : 'auto';
+$target_id   = isset( $attributes['targetId'] ) ? (int) $attributes['targetId'] : 0;
+
+if ( 'auto' === $target_type ) {
+	$post = get_post();
+	if ( ! $post ) {
+		return;
+	}
+	switch ( $post->post_type ) {
+		case \Team51\GivingDay\PostTypes\Team::POST_TYPE:
+			$target_type = GoalProgress::TYPE_TEAM;
+			$target_id   = (int) $post->ID;
+			break;
+		case \Team51\GivingDay\PostTypes\Beneficiary::POST_TYPE:
+			$target_type = GoalProgress::TYPE_BENEFICIARY;
+			$target_id   = (int) $post->ID;
+			break;
+		case \Team51\GivingDay\PostTypes\Campaign::POST_TYPE:
+			$target_type = GoalProgress::TYPE_CAMPAIGN;
+			$target_id   = (int) $post->ID;
+			break;
+		default:
+			return;
+	}
+}
+
+// Back-compat: legacy block instances stored campaignId only.
+if ( $target_id <= 0 && ! empty( $attributes['campaignId'] ) ) {
+	$target_type = GoalProgress::TYPE_CAMPAIGN;
+	$target_id   = (int) $attributes['campaignId'];
+}
+
+if ( $target_id <= 0 ) {
 	return;
 }
 
-Context::set( $campaign_id );
+if ( GoalProgress::TYPE_CAMPAIGN === $target_type ) {
+	Context::set( $target_id );
+}
 
-$progress = GoalProgress::resolve( GoalProgress::TYPE_CAMPAIGN, $campaign_id );
+$progress = GoalProgress::resolve( $target_type, $target_id );
 if ( null === $progress ) {
+	return;
+}
+
+if ( (float) $progress['goal'] <= 0 ) {
 	return;
 }
 
@@ -88,7 +125,9 @@ $wrapper_extra = array(
 			$animate_numbers ? ' is-numbers-animated' : ''
 		)
 	),
-	'data-campaign-id'      => (string) $campaign_id,
+	'data-campaign-id'      => GoalProgress::TYPE_CAMPAIGN === $target_type ? (string) $target_id : '',
+	'data-target-type'      => $target_type,
+	'data-target-id'        => (string) $target_id,
 	'data-orientation'      => $orientation,
 	'data-animate-bar'      => $animate_bar ? '1' : '0',
 	'data-animate-numbers'  => $animate_numbers ? '1' : '0',
@@ -100,7 +139,9 @@ $wrapper_extra = array(
 	'data-initial'          => esc_attr( wp_json_encode( $initial ) ),
 );
 
-$color_style = Colors::inline_style( $campaign_id );
+$color_style = GoalProgress::TYPE_CAMPAIGN === $target_type
+	? Colors::inline_style( $target_id )
+	: '';
 if ( '' !== $color_style ) {
 	$wrapper_extra['style'] = $color_style;
 }
