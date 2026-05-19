@@ -224,6 +224,98 @@ final class Aggregator {
 	}
 
 	/**
+	 * Live totals for a Team — iterates WC orders whose meta tags this Team
+	 * and sums donation line items. No transient caching yet; revisit when
+	 * traffic justifies it.
+	 *
+	 * @param int $team_id
+	 * @return array<string,mixed> Same shape as compute_campaign_totals_live().
+	 */
+	public static function totals_for_team( int $team_id ): array {
+		return self::compute_entity_totals_live( OrderAttribution::META_TEAM_ID, $team_id );
+	}
+
+	/**
+	 * Live totals for a Beneficiary — parent's own meta + own attributed
+	 * orders only; descendant roll-up is deferred to a separate decision.
+	 *
+	 * @param int $beneficiary_id
+	 * @return array<string,mixed>
+	 */
+	public static function totals_for_beneficiary( int $beneficiary_id ): array {
+		return self::compute_entity_totals_live( OrderAttribution::META_BENEFICIARY_ID, $beneficiary_id );
+	}
+
+	/**
+	 * @param string $meta_key  Order meta key identifying the entity type.
+	 * @param int    $entity_id Post ID of the entity.
+	 * @return array<string,mixed>
+	 */
+	private static function compute_entity_totals_live( string $meta_key, int $entity_id ): array {
+		$raised     = 0.0;
+		$count      = 0;
+		$donor_keys = array();
+
+		if ( ! function_exists( 'wc_get_orders' ) ) {
+			$currency = (string) get_option( 'woocommerce_currency', 'USD' );
+			return array(
+				'entity_id'     => $entity_id,
+				'raised'        => 0.0,
+				'count'         => 0,
+				'avg'           => 0.0,
+				'unique_donors' => 0,
+				'currency'      => $currency,
+				'server_time'   => gmdate( 'c' ),
+			);
+		}
+
+		$order_ids = wc_get_orders(
+			array(
+				'limit'      => -1,
+				'return'     => 'ids',
+				'status'     => self::COUNTING_STATUSES,
+				'meta_query' => array( // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_query
+					array(
+						'key'   => $meta_key,
+						'value' => (string) $entity_id,
+					),
+				),
+			)
+		);
+		$order_ids = is_array( $order_ids ) ? $order_ids : array();
+
+		foreach ( $order_ids as $order_id ) {
+			$order = wc_get_order( $order_id );
+			if ( ! $order instanceof WC_Order ) {
+				continue;
+			}
+			$donation_total = self::donation_total_for_order( $order );
+			if ( $donation_total <= 0 ) {
+				continue;
+			}
+			$raised += $donation_total;
+			++$count;
+
+			$donor_key = self::donor_key_for_order( $order );
+			if ( null !== $donor_key ) {
+				$donor_keys[ $donor_key ] = true;
+			}
+		}
+
+		$currency = (string) get_option( 'woocommerce_currency', 'USD' );
+
+		return array(
+			'entity_id'     => $entity_id,
+			'raised'        => round( $raised, 2 ),
+			'count'         => $count,
+			'avg'           => $count > 0 ? round( $raised / $count, 2 ) : 0.0,
+			'unique_donors' => count( $donor_keys ),
+			'currency'      => $currency,
+			'server_time'   => gmdate( 'c' ),
+		);
+	}
+
+	/**
 	 * Live (un-snapshotted) computation of campaign-wide totals. Extracted
 	 * from {@see self::totals_for_campaign()} so {@see self::snapshot_campaign()}
 	 * and the snapshot read path can share one implementation.
