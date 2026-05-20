@@ -34,6 +34,15 @@
 		"campaignId": {
 			"type": "number"
 		},
+		"targetType": {
+			"type": "string",
+			"default": "auto",
+			"enum": [ "auto", "campaign", "team", "beneficiary" ]
+		},
+		"targetId": {
+			"type": "number",
+			"default": 0
+		},
 		"orientation": {
 			"type": "string",
 			"default": "horizontal",

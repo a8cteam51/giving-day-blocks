@@ -22,13 +22,17 @@
 
 namespace Team51\GivingDay\Data;
 
+use Team51\GivingDay\PostTypes\Beneficiary;
 use Team51\GivingDay\PostTypes\Campaign;
+use Team51\GivingDay\PostTypes\Team;
 
 defined( 'ABSPATH' ) || exit;
 
 final class GoalProgress {
 
-	public const TYPE_CAMPAIGN = 'campaign';
+	public const TYPE_CAMPAIGN    = 'campaign';
+	public const TYPE_TEAM        = 'team';
+	public const TYPE_BENEFICIARY = 'beneficiary';
 
 	/**
 	 * Resolves a target descriptor to a normalized progress payload.
@@ -58,6 +62,10 @@ final class GoalProgress {
 		switch ( $type ) {
 			case self::TYPE_CAMPAIGN:
 				return self::resolve_campaign( $id );
+			case self::TYPE_TEAM:
+				return self::resolve_team( $id );
+			case self::TYPE_BENEFICIARY:
+				return self::resolve_beneficiary( $id );
 			default:
 				return null;
 		}
@@ -78,6 +86,69 @@ final class GoalProgress {
 		$totals = Aggregator::totals_for_campaign( $campaign_id );
 
 		$goal     = (float) get_post_meta( $campaign_id, Campaign::META_GOAL_AMOUNT, true );
+		$raised   = isset( $totals['raised'] ) ? (float) $totals['raised'] : 0.0;
+		$donors   = isset( $totals['unique_donors'] ) ? (int) $totals['unique_donors'] : 0;
+		$currency = isset( $totals['currency'] ) ? (string) $totals['currency'] : (string) get_option( 'woocommerce_currency', 'USD' );
+
+		$percent_raw = $goal > 0 ? ( $raised / $goal ) * 100 : 0.0;
+		$percent     = max( 0.0, min( 100.0, $percent_raw ) );
+
+		return array(
+			'goal'        => $goal,
+			'raised'      => $raised,
+			'donor_count' => $donors,
+			'currency'    => $currency,
+			'percent'     => round( $percent, 2 ),
+			'percent_raw' => round( $percent_raw, 2 ),
+		);
+	}
+
+	/**
+	 * Team branch.
+	 *
+	 * @param int $team_id
+	 * @return array<string,mixed>|null
+	 */
+	private static function resolve_team( int $team_id ): ?array {
+		$post = get_post( $team_id );
+		if ( ! $post || Team::POST_TYPE !== $post->post_type ) {
+			return null;
+		}
+
+		$totals   = Aggregator::totals_for_team( $team_id );
+		$goal     = (float) get_post_meta( $team_id, Team::META_GOAL_AMOUNT, true );
+		$raised   = isset( $totals['raised'] ) ? (float) $totals['raised'] : 0.0;
+		$donors   = isset( $totals['unique_donors'] ) ? (int) $totals['unique_donors'] : 0;
+		$currency = isset( $totals['currency'] ) ? (string) $totals['currency'] : (string) get_option( 'woocommerce_currency', 'USD' );
+
+		$percent_raw = $goal > 0 ? ( $raised / $goal ) * 100 : 0.0;
+		$percent     = max( 0.0, min( 100.0, $percent_raw ) );
+
+		return array(
+			'goal'        => $goal,
+			'raised'      => $raised,
+			'donor_count' => $donors,
+			'currency'    => $currency,
+			'percent'     => round( $percent, 2 ),
+			'percent_raw' => round( $percent_raw, 2 ),
+		);
+	}
+
+	/**
+	 * Beneficiary branch. Uses the post's own goal meta and own attributed
+	 * orders; no descendant roll-up at this stage.
+	 *
+	 * @param int $beneficiary_id
+	 * @return array<string,mixed>|null
+	 */
+	private static function resolve_beneficiary( int $beneficiary_id ): ?array {
+		$post = get_post( $beneficiary_id );
+		if ( ! $post || Beneficiary::POST_TYPE !== $post->post_type ) {
+			return null;
+		}
+
+		$totals   = Aggregator::totals_for_beneficiary( $beneficiary_id );
+		$goal     = (float) get_post_meta( $beneficiary_id, Beneficiary::META_GOAL_AMOUNT, true );
 		$raised   = isset( $totals['raised'] ) ? (float) $totals['raised'] : 0.0;
 		$donors   = isset( $totals['unique_donors'] ) ? (int) $totals['unique_donors'] : 0;
 		$currency = isset( $totals['currency'] ) ? (string) $totals['currency'] : (string) get_option( 'woocommerce_currency', 'USD' );

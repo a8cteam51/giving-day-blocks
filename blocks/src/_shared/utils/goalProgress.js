@@ -55,6 +55,24 @@ export function summaryPathFor( target ) {
 	}
 }
 
+export function goalProgressEndpoint( type, id ) {
+	const numericId = Number( id );
+	if ( ! Number.isInteger( numericId ) || numericId <= 0 ) {
+		return null;
+	}
+	const base = '/giving-day/v1';
+	switch ( type ) {
+		case 'campaign':
+			return `${ base }/campaign/${ numericId }/summary`;
+		case 'team':
+			return `${ base }/team/${ numericId }/summary`;
+		case 'beneficiary':
+			return `${ base }/beneficiary/${ numericId }/summary`;
+		default:
+			return null;
+	}
+}
+
 /**
  * Clamps a percent for visual bar fill (0–100). Useful when the
  * underlying summary already reports a >100% raised total but we still

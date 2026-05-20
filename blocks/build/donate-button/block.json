@@ -1,0 +1,64 @@
+{
+  "$schema": "https://schemas.wp.org/trunk/block.json",
+  "apiVersion": 3,
+  "name": "giving-day/donate-button",
+  "version": "0.1.0",
+  "title": "Giving Day: Donate Button",
+  "category": "widgets",
+  "icon": "money-alt",
+  "description": "A donation call-to-action button. Auto-tags the donation form with the current Team or Beneficiary via gd_team / gd_beneficiary URL params.",
+  "keywords": [
+    "giving day",
+    "donate",
+    "button",
+    "cta"
+  ],
+  "textdomain": "giving-day-blocks",
+  "supports": {
+    "html": false,
+    "color": {
+      "background": true,
+      "text": true,
+      "link": true
+    },
+    "spacing": {
+      "margin": true,
+      "padding": true
+    },
+    "typography": {
+      "fontSize": true,
+      "fontWeight": true
+    },
+    "align": [
+      "wide",
+      "full",
+      "left",
+      "center",
+      "right"
+    ]
+  },
+  "attributes": {
+    "label": {
+      "type": "string",
+      "default": "Donate"
+    },
+    "targetType": {
+      "type": "string",
+      "default": "auto",
+      "enum": [
+        "auto",
+        "team",
+        "beneficiary",
+        "none"
+      ]
+    },
+    "targetId": {
+      "type": "number",
+      "default": 0
+    }
+  },
+  "editorScript": "file:./index.js",
+  "style": "file:./style-index.css",
+  "editorStyle": "file:./index.css",
+  "render": "file:./render.php"
+}

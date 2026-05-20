@@ -2,19 +2,38 @@
 
 An out-of-the-box, open-source **Giving Day** product for WooCommerce. A set of purpose-built Gutenberg blocks, a shared data layer, and an admin dashboard that let any organization launch a complete fundraiser event in minutes instead of months.
 
+## Requirements
+
+- **WordPress 6.7+** (for FSE template registration)
+- **WooCommerce** (for donation products and order handling)
+- **PHP 8.1+**
+
 ## What you get
 
 Seven blocks designed to work together during a Giving Day event:
 
 | Block | Purpose |
 |-------|---------|
-| `giving-day/goal-progress` | Real-time visual tracker toward a fundraising goal. Horizontal and vertical layouts. |
+| `giving-day/goal-progress` | Goal + progress bar. Supports Campaign, Team, and Beneficiary targets (auto-detects from the current post type). Horizontal and vertical layouts. |
 | `giving-day/countdown` | Unified hero slot. Pre-event countdown → event-day countdown → final totals, transitioning automatically on `server_time`. Toggle `hidePostEvent` to pair with a standalone Totals block elsewhere. |
 | `giving-day/totals` | Standalone totals. `mode: auto` shows the running number while live and the final once the event ends; `mode: final-only` stays hidden until the event ends. |
 | `giving-day/leaderboard` | Top donors, teams, campaigns, or causes. Configurable dimension and size. |
 | `giving-day/match-my-gift` | Sponsor matching banner that doubles donation urgency. |
 | `giving-day/challenges` | Time-boxed mini-events (e.g. "50 donations in the next hour unlocks $10,000"). |
 | `giving-day/war-room` | Back-office live dashboard for organizers. Block + standalone admin page. |
+| `giving-day/donate-button` | Donate call-to-action that auto-tags donations with the current Team or Beneficiary via URL params. |
+
+## Single Team / Beneficiary pages
+
+This plugin ships FSE block templates that render a goal progress bar (when a goal is set) and a Donate button on every single Team and single Beneficiary post page.
+
+**Requirements:**
+- WordPress 6.7+ (for `register_block_template()`).
+- A block (FSE) theme. The plugin's FSE templates have no effect on classic themes.
+
+**Theme overrides:** If your active theme ships its own `single-giving_team.html` / `single-giving_beneficiary.html`, that theme template takes precedence over the plugin's. The plugin templates are a fallback for block themes that don't provide their own.
+
+**Donation page:** Configurable at **Settings → Reading → "Donation page"**. Defaults to `/donate`. For programmatic override, filter `giving_day_donation_page_url`.
 
 All blocks are:
 

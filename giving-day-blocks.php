@@ -11,8 +11,8 @@
  * Plugin Name:             Giving Day Blocks
  * Plugin URI:              https://github.com/a8cteam51/giving-day-blocks
  * Description:             An out-of-the-box Giving Day product for WooCommerce. Blocks, data layer, and admin dashboard for running a fundraiser event. Compatible with Simple Donations.
- * Version:                 1.0.1
- * Requires at least:       6.4
+ * Version:                 1.1.0
+ * Requires at least:       6.7
  * Requires PHP:            8.1
  * Author:                  Team51 Special Projects
  * Author URI:              https://wpspecialprojects.wordpress.com
@@ -26,7 +26,7 @@
 
 defined( 'ABSPATH' ) || exit;
 
-define( 'GIVING_DAY_BLOCKS_VERSION', '1.0.1' );
+define( 'GIVING_DAY_BLOCKS_VERSION', '1.1.0' );
 define( 'GIVING_DAY_BLOCKS_BASENAME', plugin_basename( __FILE__ ) );
 define( 'GIVING_DAY_BLOCKS_PATH', plugin_dir_path( __FILE__ ) );
 define( 'GIVING_DAY_BLOCKS_URL', plugin_dir_url( __FILE__ ) );

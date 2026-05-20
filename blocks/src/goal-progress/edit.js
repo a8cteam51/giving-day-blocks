@@ -9,6 +9,7 @@ import {
 	Notice,
 	__experimentalToggleGroupControl as ToggleGroupControl,
 	__experimentalToggleGroupControlOption as ToggleGroupControlOption,
+	__experimentalNumberControl as NumberControl,
 } from '@wordpress/components';
 import { useSelect } from '@wordpress/data';
 import { useMemo } from '@wordpress/element';
@@ -28,6 +29,8 @@ const PREVIEW_PERCENT = 42;
 export default function Edit( { attributes, setAttributes } ) {
 	const {
 		campaignId,
+		targetType,
+		targetId,
 		orientation,
 		showPercent,
 		showRaised,
@@ -105,8 +108,42 @@ export default function Edit( { attributes, setAttributes } ) {
 	const campaignTitle =
 		campaign?.title?.rendered || campaign?.title?.raw || '';
 
+	const explicitNonCampaign =
+		targetType === 'team' || targetType === 'beneficiary';
+	const autoWithoutCampaignFallback =
+		targetType === 'auto' && ! campaignId;
+	const showFrontEndOnlyNotice =
+		explicitNonCampaign || autoWithoutCampaignFallback;
+
 	let body;
-	if ( ! campaignId ) {
+	if ( showFrontEndOnlyNotice ) {
+		const instructions = explicitNonCampaign
+			? sprintf(
+					/* translators: 1: target type label ("Team" or "Beneficiary"), 2: target post id (or em dash when unset) */
+					__(
+						'Targeting %1$s #%2$s. The progress bar renders on the front-end — no editor preview for this target type.',
+						'giving-day-blocks'
+					),
+					targetType === 'team'
+						? __( 'Team', 'giving-day-blocks' )
+						: __( 'Beneficiary', 'giving-day-blocks' ),
+					targetId ? String( targetId ) : '—'
+			  )
+			: __(
+					'"Auto" target: the bar resolves the current Team, Beneficiary, or Campaign at front-end render. No editor preview for this mode.',
+					'giving-day-blocks'
+			  );
+		body = (
+			<Placeholder
+				icon="chart-bar"
+				label={ __(
+					'Giving Day: Goal + Progress',
+					'giving-day-blocks'
+				) }
+				instructions={ instructions }
+			/>
+		);
+	} else if ( ! campaignId ) {
 		body = (
 			<Placeholder
 				icon="chart-bar"
@@ -188,6 +225,28 @@ export default function Edit( { attributes, setAttributes } ) {
 	return (
 		<>
 			<InspectorControls>
+				<PanelBody title={ __( 'Target', 'giving-day-blocks' ) } initialOpen={ true }>
+					<SelectControl
+						label={ __( 'Target type', 'giving-day-blocks' ) }
+						value={ targetType || 'auto' }
+						options={ [
+							{ label: __( 'Auto (use current post)', 'giving-day-blocks' ), value: 'auto' },
+							{ label: __( 'Campaign', 'giving-day-blocks' ), value: 'campaign' },
+							{ label: __( 'Team', 'giving-day-blocks' ), value: 'team' },
+							{ label: __( 'Beneficiary', 'giving-day-blocks' ), value: 'beneficiary' },
+						] }
+						onChange={ ( value ) => setAttributes( { targetType: value, targetId: 0 } ) }
+						help={ __( '"Auto" picks the goal of the current Team, Beneficiary, or Campaign page at render.', 'giving-day-blocks' ) }
+					/>
+					{ targetType && targetType !== 'auto' && (
+						<NumberControl
+							label={ __( 'Target post ID', 'giving-day-blocks' ) }
+							value={ targetId || 0 }
+							onChange={ ( value ) => setAttributes( { targetId: parseInt( value, 10 ) || 0 } ) }
+							min={ 0 }
+						/>
+					) }
+				</PanelBody>
 				<PanelBody title={ __( 'Campaign', 'giving-day-blocks' ) }>
 					<SelectControl
 						label={ __( 'Campaign', 'giving-day-blocks' ) }

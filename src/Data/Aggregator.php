@@ -55,6 +55,18 @@ final class Aggregator {
 	private const TOTALS_TRANSIENT_PREFIX = 'gd_totals_';
 
 	/**
+	 * Transient prefix for entity (team/beneficiary) totals payloads.
+	 */
+	private const ENTITY_TOTALS_TRANSIENT_PREFIX = 'gd_entity_totals_';
+
+	/**
+	 * Short TTL for entity totals — long enough to absorb polling bursts,
+	 * short enough that donations show up within a sensible window even if
+	 * the order-status invalidation hook is bypassed.
+	 */
+	private const ENTITY_TOTALS_TTL_SECONDS = 30;
+
+	/**
 	 * Campaign post_meta key holding the frozen post-event results snapshot.
 	 *
 	 * Written by {@see self::snapshot_campaign()} once an event has ended and
@@ -129,6 +141,15 @@ final class Aggregator {
 		$campaign_id = (int) $order->get_meta( OrderAttribution::META_CAMPAIGN_ID );
 		if ( $campaign_id > 0 ) {
 			self::invalidate( $campaign_id );
+		}
+
+		$team_id = (int) $order->get_meta( OrderAttribution::META_TEAM_ID );
+		if ( $team_id > 0 ) {
+			self::invalidate_entity_totals( OrderAttribution::META_TEAM_ID, $team_id );
+		}
+		$beneficiary_id = (int) $order->get_meta( OrderAttribution::META_BENEFICIARY_ID );
+		if ( $beneficiary_id > 0 ) {
+			self::invalidate_entity_totals( OrderAttribution::META_BENEFICIARY_ID, $beneficiary_id );
 		}
 	}
 
@@ -221,6 +242,128 @@ final class Aggregator {
 		set_transient( $key, $payload, self::cache_ttl_seconds( $campaign_id, $preview_override ) );
 
 		return $payload;
+	}
+
+	/**
+	 * Totals for a Team. Cached in a short-lived transient so polling
+	 * REST clients don't re-scan all orders on every hit. Invalidated by
+	 * {@see self::on_order_status_changed()} when an order touching this
+	 * Team transitions to an aggregate-affecting status.
+	 *
+	 * @param int $team_id
+	 * @return array<string,mixed> Same shape as compute_campaign_totals_live().
+	 */
+	public static function totals_for_team( int $team_id ): array {
+		return self::totals_for_entity( OrderAttribution::META_TEAM_ID, $team_id );
+	}
+
+	/**
+	 * Totals for a Beneficiary — parent's own meta + own attributed orders
+	 * only; descendant roll-up is deferred. Cached like Team totals.
+	 *
+	 * @param int $beneficiary_id
+	 * @return array<string,mixed>
+	 */
+	public static function totals_for_beneficiary( int $beneficiary_id ): array {
+		return self::totals_for_entity( OrderAttribution::META_BENEFICIARY_ID, $beneficiary_id );
+	}
+
+	/**
+	 * Drops the cached totals for one Team or Beneficiary.
+	 *
+	 * @param string $meta_key  OrderAttribution::META_TEAM_ID or META_BENEFICIARY_ID.
+	 * @param int    $entity_id Post ID of the Team or Beneficiary.
+	 */
+	public static function invalidate_entity_totals( string $meta_key, int $entity_id ): void {
+		if ( $entity_id <= 0 ) {
+			return;
+		}
+		delete_transient( self::entity_totals_transient_key( $meta_key, $entity_id ) );
+	}
+
+	private static function totals_for_entity( string $meta_key, int $entity_id ): array {
+		$key    = self::entity_totals_transient_key( $meta_key, $entity_id );
+		$cached = get_transient( $key );
+		if ( false !== $cached && is_array( $cached ) ) {
+			return $cached;
+		}
+
+		$payload = self::compute_entity_totals_live( $meta_key, $entity_id );
+		set_transient( $key, $payload, self::ENTITY_TOTALS_TTL_SECONDS );
+		return $payload;
+	}
+
+	private static function entity_totals_transient_key( string $meta_key, int $entity_id ): string {
+		return sprintf( '%s%s_%d', self::ENTITY_TOTALS_TRANSIENT_PREFIX, $meta_key, $entity_id );
+	}
+
+	/**
+	 * @param string $meta_key  Order meta key identifying the entity type.
+	 * @param int    $entity_id Post ID of the entity.
+	 * @return array<string,mixed>
+	 */
+	private static function compute_entity_totals_live( string $meta_key, int $entity_id ): array {
+		$raised     = 0.0;
+		$count      = 0;
+		$donor_keys = array();
+
+		if ( ! function_exists( 'wc_get_orders' ) ) {
+			$currency = (string) get_option( 'woocommerce_currency', 'USD' );
+			return array(
+				'entity_id'     => $entity_id,
+				'raised'        => 0.0,
+				'count'         => 0,
+				'avg'           => 0.0,
+				'unique_donors' => 0,
+				'currency'      => $currency,
+				'server_time'   => gmdate( 'c' ),
+			);
+		}
+
+		$order_ids = wc_get_orders(
+			array(
+				'limit'      => -1,
+				'return'     => 'ids',
+				'status'     => self::COUNTING_STATUSES,
+				'meta_query' => array( // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_query
+					array(
+						'key'   => $meta_key,
+						'value' => (string) $entity_id,
+					),
+				),
+			)
+		);
+		$order_ids = is_array( $order_ids ) ? $order_ids : array();
+
+		foreach ( $order_ids as $order_id ) {
+			$order = wc_get_order( $order_id );
+			if ( ! $order instanceof WC_Order ) {
+				continue;
+			}
+			$donation_total = self::donation_total_for_order( $order );
+			if ( $donation_total <= 0 ) {
+				continue;
+			}
+			$raised += $donation_total;
+			++$count;
+
+			$donor_key = self::donor_key_for_order( $order );
+			if ( null !== $donor_key ) {
+				$donor_keys[ $donor_key ] = true;
+			}
+		}
+
+		$currency = (string) get_option( 'woocommerce_currency', 'USD' );
+
+		return array(
+			'entity_id'     => $entity_id,
+			'raised'        => round( $raised, 2 ),
+			'count'         => $count,
+			'avg'           => $count > 0 ? round( $raised / $count, 2 ) : 0.0,
+			'unique_donors' => count( $donor_keys ),
+			'currency'      => $currency,
+			'server_time'   => gmdate( 'c' ),
+		);
 	}
 
 	/**
