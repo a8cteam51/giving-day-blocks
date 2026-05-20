@@ -47,7 +47,7 @@ $href = DonationUrl::build( $target_type, $target_id );
 
 $wrapper_attrs = get_block_wrapper_attributes(
 	array(
-		'class' => 'giving-day-donate-button',
+		'class' => 'wp-block-button giving-day-donate-button',
 	)
 );
 ?>
