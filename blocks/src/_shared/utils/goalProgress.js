@@ -56,11 +56,11 @@ export function summaryPathFor( target ) {
 }
 
 export function goalProgressEndpoint( type, id ) {
-	const numericId = parseInt( id, 10 );
-	if ( ! numericId || numericId <= 0 ) {
+	const numericId = Number( id );
+	if ( ! Number.isInteger( numericId ) || numericId <= 0 ) {
 		return null;
 	}
-	const base = '/wp-json/giving-day/v1';
+	const base = '/giving-day/v1';
 	switch ( type ) {
 		case 'campaign':
 			return `${ base }/campaign/${ numericId }/summary`;

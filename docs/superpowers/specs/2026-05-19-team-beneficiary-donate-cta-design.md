@@ -19,7 +19,7 @@ Out of scope for this spec: archive/listing pages (the CPTs use `has_archive => 
 
 Three units, each with one clear job:
 
-```
+```text
                        ┌──────────────────────────────────┐
    FSE template        │  templates/single-team.html      │
    (plugin-registered) │  templates/single-beneficiary.html│
@@ -106,7 +106,7 @@ Replace the campaign-only picker with a target-type selector + post-picker. Defa
 
 ### 3. `donate-button` block — new
 
-**Files (new):** `blocks/src/donate-button/{block.json,edit.js,render.php,view.js,style.scss,editor.scss,index.js}`
+**Files (new):** `blocks/src/donate-button/{block.json,edit.js,render.php,style.scss,editor.scss,index.js}`
 
 A small server-rendered block. Renders an `<a>` styled as a button.
 
@@ -170,7 +170,7 @@ register_block_template(
 
 **Template content (conceptual layout, exact markup TBD in implementation):**
 
-```
+```text
 - Header (theme default)
 - Post title
 - giving-day/goal-progress  (targetType: auto)

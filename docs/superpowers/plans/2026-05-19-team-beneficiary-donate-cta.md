@@ -602,7 +602,8 @@ echo DonationUrl::build( DonationUrl::TYPE_NONE ) . PHP_EOL;
 ```
 
 Expected (with default settings):
-```
+
+```text
 http://giving-day.local/donate?gd_team=701
 http://giving-day.local/donate?gd_beneficiary=612
 http://giving-day.local/donate
@@ -1202,7 +1203,7 @@ The other blocks have a `register_block_type()` call somewhere in PHP that point
 - [ ] **Step 1: Locate the existing registrations**
 
 ```bash
-grep -n "register_block_type\|register_block_type_from_metadata" /Users/ecairol/www/giving-day/wp-content/plugins/giving-day-blocks/src/Blocks.php
+grep -n "register_block_type\|register_block_type_from_metadata" src/Blocks.php
 ```
 
 Read how other blocks (e.g., `goal-progress`) get registered.

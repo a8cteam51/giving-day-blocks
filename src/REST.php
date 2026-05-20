@@ -505,10 +505,20 @@ final class REST {
 	 * @return WP_REST_Response|WP_Error
 	 */
 	public function team_summary( WP_REST_Request $request ) {
-		$id      = (int) $request['id'];
+		$id       = (int) $request['id'];
+		$not_found = new WP_Error( 'not_found', __( 'Team not found.', 'giving-day-blocks' ), array( 'status' => 404 ) );
+		$post     = get_post( $id );
+		if (
+			! $post
+			|| Team::POST_TYPE !== $post->post_type
+			|| ( 'publish' !== $post->post_status && ! current_user_can( 'read_post', $post->ID ) )
+		) {
+			return $not_found;
+		}
+
 		$payload = GoalProgress::resolve( GoalProgress::TYPE_TEAM, $id );
 		if ( null === $payload ) {
-			return new WP_Error( 'not_found', __( 'Team not found.', 'giving-day-blocks' ), array( 'status' => 404 ) );
+			return $not_found;
 		}
 		$payload['server_time'] = gmdate( 'c' );
 		return $this->respond( $payload );
@@ -521,10 +531,20 @@ final class REST {
 	 * @return WP_REST_Response|WP_Error
 	 */
 	public function beneficiary_summary( WP_REST_Request $request ) {
-		$id      = (int) $request['id'];
+		$id        = (int) $request['id'];
+		$not_found = new WP_Error( 'not_found', __( 'Beneficiary not found.', 'giving-day-blocks' ), array( 'status' => 404 ) );
+		$post      = get_post( $id );
+		if (
+			! $post
+			|| Beneficiary::POST_TYPE !== $post->post_type
+			|| ( 'publish' !== $post->post_status && ! current_user_can( 'read_post', $post->ID ) )
+		) {
+			return $not_found;
+		}
+
 		$payload = GoalProgress::resolve( GoalProgress::TYPE_BENEFICIARY, $id );
 		if ( null === $payload ) {
-			return new WP_Error( 'not_found', __( 'Beneficiary not found.', 'giving-day-blocks' ), array( 'status' => 404 ) );
+			return $not_found;
 		}
 		$payload['server_time'] = gmdate( 'c' );
 		return $this->respond( $payload );

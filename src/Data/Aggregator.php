@@ -55,6 +55,18 @@ final class Aggregator {
 	private const TOTALS_TRANSIENT_PREFIX = 'gd_totals_';
 
 	/**
+	 * Transient prefix for entity (team/beneficiary) totals payloads.
+	 */
+	private const ENTITY_TOTALS_TRANSIENT_PREFIX = 'gd_entity_totals_';
+
+	/**
+	 * Short TTL for entity totals — long enough to absorb polling bursts,
+	 * short enough that donations show up within a sensible window even if
+	 * the order-status invalidation hook is bypassed.
+	 */
+	private const ENTITY_TOTALS_TTL_SECONDS = 30;
+
+	/**
 	 * Campaign post_meta key holding the frozen post-event results snapshot.
 	 *
 	 * Written by {@see self::snapshot_campaign()} once an event has ended and
@@ -129,6 +141,15 @@ final class Aggregator {
 		$campaign_id = (int) $order->get_meta( OrderAttribution::META_CAMPAIGN_ID );
 		if ( $campaign_id > 0 ) {
 			self::invalidate( $campaign_id );
+		}
+
+		$team_id = (int) $order->get_meta( OrderAttribution::META_TEAM_ID );
+		if ( $team_id > 0 ) {
+			self::invalidate_entity_totals( OrderAttribution::META_TEAM_ID, $team_id );
+		}
+		$beneficiary_id = (int) $order->get_meta( OrderAttribution::META_BENEFICIARY_ID );
+		if ( $beneficiary_id > 0 ) {
+			self::invalidate_entity_totals( OrderAttribution::META_BENEFICIARY_ID, $beneficiary_id );
 		}
 	}
 
@@ -224,26 +245,56 @@ final class Aggregator {
 	}
 
 	/**
-	 * Live totals for a Team — iterates WC orders whose meta tags this Team
-	 * and sums donation line items. No transient caching yet; revisit when
-	 * traffic justifies it.
+	 * Totals for a Team. Cached in a short-lived transient so polling
+	 * REST clients don't re-scan all orders on every hit. Invalidated by
+	 * {@see self::on_order_status_changed()} when an order touching this
+	 * Team transitions to an aggregate-affecting status.
 	 *
 	 * @param int $team_id
 	 * @return array<string,mixed> Same shape as compute_campaign_totals_live().
 	 */
 	public static function totals_for_team( int $team_id ): array {
-		return self::compute_entity_totals_live( OrderAttribution::META_TEAM_ID, $team_id );
+		return self::totals_for_entity( OrderAttribution::META_TEAM_ID, $team_id );
 	}
 
 	/**
-	 * Live totals for a Beneficiary — parent's own meta + own attributed
-	 * orders only; descendant roll-up is deferred to a separate decision.
+	 * Totals for a Beneficiary — parent's own meta + own attributed orders
+	 * only; descendant roll-up is deferred. Cached like Team totals.
 	 *
 	 * @param int $beneficiary_id
 	 * @return array<string,mixed>
 	 */
 	public static function totals_for_beneficiary( int $beneficiary_id ): array {
-		return self::compute_entity_totals_live( OrderAttribution::META_BENEFICIARY_ID, $beneficiary_id );
+		return self::totals_for_entity( OrderAttribution::META_BENEFICIARY_ID, $beneficiary_id );
+	}
+
+	/**
+	 * Drops the cached totals for one Team or Beneficiary.
+	 *
+	 * @param string $meta_key  OrderAttribution::META_TEAM_ID or META_BENEFICIARY_ID.
+	 * @param int    $entity_id Post ID of the Team or Beneficiary.
+	 */
+	public static function invalidate_entity_totals( string $meta_key, int $entity_id ): void {
+		if ( $entity_id <= 0 ) {
+			return;
+		}
+		delete_transient( self::entity_totals_transient_key( $meta_key, $entity_id ) );
+	}
+
+	private static function totals_for_entity( string $meta_key, int $entity_id ): array {
+		$key    = self::entity_totals_transient_key( $meta_key, $entity_id );
+		$cached = get_transient( $key );
+		if ( false !== $cached && is_array( $cached ) ) {
+			return $cached;
+		}
+
+		$payload = self::compute_entity_totals_live( $meta_key, $entity_id );
+		set_transient( $key, $payload, self::ENTITY_TOTALS_TTL_SECONDS );
+		return $payload;
+	}
+
+	private static function entity_totals_transient_key( string $meta_key, int $entity_id ): string {
+		return sprintf( '%s%s_%d', self::ENTITY_TOTALS_TRANSIENT_PREFIX, $meta_key, $entity_id );
 	}
 
 	/**

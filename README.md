@@ -6,7 +6,7 @@ An out-of-the-box, open-source **Giving Day** product for WooCommerce. A set of 
 
 - **WordPress 6.7+** (for FSE template registration)
 - **WooCommerce** (for donation products and order handling)
-- **PHP 7.4+**
+- **PHP 8.1+**
 
 ## What you get
 

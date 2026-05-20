@@ -108,8 +108,42 @@ export default function Edit( { attributes, setAttributes } ) {
 	const campaignTitle =
 		campaign?.title?.rendered || campaign?.title?.raw || '';
 
+	const explicitNonCampaign =
+		targetType === 'team' || targetType === 'beneficiary';
+	const autoWithoutCampaignFallback =
+		targetType === 'auto' && ! campaignId;
+	const showFrontEndOnlyNotice =
+		explicitNonCampaign || autoWithoutCampaignFallback;
+
 	let body;
-	if ( ! campaignId ) {
+	if ( showFrontEndOnlyNotice ) {
+		const instructions = explicitNonCampaign
+			? sprintf(
+					/* translators: 1: target type label ("Team" or "Beneficiary"), 2: target post id (or em dash when unset) */
+					__(
+						'Targeting %1$s #%2$s. The progress bar renders on the front-end — no editor preview for this target type.',
+						'giving-day-blocks'
+					),
+					targetType === 'team'
+						? __( 'Team', 'giving-day-blocks' )
+						: __( 'Beneficiary', 'giving-day-blocks' ),
+					targetId ? String( targetId ) : '—'
+			  )
+			: __(
+					'"Auto" target: the bar resolves the current Team, Beneficiary, or Campaign at front-end render. No editor preview for this mode.',
+					'giving-day-blocks'
+			  );
+		body = (
+			<Placeholder
+				icon="chart-bar"
+				label={ __(
+					'Giving Day: Goal + Progress',
+					'giving-day-blocks'
+				) }
+				instructions={ instructions }
+			/>
+		);
+	} else if ( ! campaignId ) {
 		body = (
 			<Placeholder
 				icon="chart-bar"
