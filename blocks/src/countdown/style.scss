@@ -1,6 +1,8 @@
 @import "../_shared/tokens";
 
 .giving-day-countdown {
+	container-type: inline-size;
+	container-name: giving-day-countdown;
 	border-radius: var(--giving-day-radius);
 	padding: 1.5rem;
 	text-align: center;
@@ -26,23 +28,23 @@
 		display: flex;
 		flex-wrap: wrap;
 		justify-content: center;
-		gap: 0.5rem 1rem;
+		gap: 1rem 3%;
 		margin-bottom: 1rem;
-
-		@include media(sm) {
-			gap: 1rem 1.5rem;
-		}
 	}
 
 	&__unit {
 		display: flex;
 		flex-direction: column;
 		align-items: center;
-		min-width: 3.5rem;
+		min-width: 0;
 	}
 
+	// Countdown values and the post-event total scale with the block's own
+	// width via container queries, so the same block fits a sidebar (~300px)
+	// and a hero (~1200px) without theme overrides. `cqi` = 1% of container
+	// inline size; `clamp(min, fluid, max)` keeps them legible at extremes.
 	&__value {
-		font-size: clamp(2rem, 6vw, 3.5rem);
+		font-size: clamp(1.25rem, 14cqi, 3.5rem);
 		font-weight: 700;
 		line-height: 1;
 		font-variant-numeric: tabular-nums;
@@ -51,9 +53,9 @@
 
 	&__label {
 		margin-top: 0.25rem;
-		font-size: 0.75rem;
+		font-size: 0.7rem;
 		text-transform: uppercase;
-		letter-spacing: 0.08em;
+		letter-spacing: 0.03em;
 		color: var(--giving-day-muted);
 	}
 
@@ -64,7 +66,7 @@
 	}
 
 	&__final {
-		font-size: clamp(2.5rem, 8vw, 4.5rem);
+		font-size: clamp(1.75rem, 18cqi, 4.5rem);
 		font-weight: 800;
 		line-height: 1;
 		margin: 0.5rem 0;

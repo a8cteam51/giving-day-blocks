@@ -1,8 +1,7 @@
-.giving-day-donate-button {
-	display: inline-block;
-
-	&__link {
-		display: inline-block;
-		text-decoration: none;
-	}
+// Display rules come from core/button's stylesheet (wp-block-button +
+// wp-block-button__link), so the wrapper inherits inline-block behavior
+// and the `wp-block-button__width-100` / `has-custom-width` classes work
+// without us shadowing them. We only add what core doesn't already cover.
+.giving-day-donate-button__link {
+	text-decoration: none;
 }

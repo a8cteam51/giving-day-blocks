@@ -1,6 +1,8 @@
 @import "../_shared/tokens";
 
 .giving-day-goal-progress {
+	container-type: inline-size;
+	container-name: giving-day-goal-progress;
 	background: var(--giving-day-surface);
 	color: var(--giving-day-secondary);
 	padding: 1.25rem;
@@ -12,13 +14,19 @@
 		gap: 0.5rem;
 	}
 
+	// Raised total scales with the block's own width via container queries
+	// (`cqi` = 1% of inline size) so the same number fits whether it's $5,000
+	// in a wide hero or $30M in a narrow sidebar — variant blocks below tune
+	// the clamp range for orientation.
 	&__raised {
 		margin: 0;
-		font-size: clamp(2rem, 6vw, 3rem);
+		font-size: clamp(1rem, 13cqi, 3rem);
 		font-weight: 800;
 		line-height: 1.05;
 		color: var(--giving-day-primary);
 		font-variant-numeric: tabular-nums;
+		overflow-wrap: anywhere;
+		text-wrap: balance;
 	}
 
 	&__track {
