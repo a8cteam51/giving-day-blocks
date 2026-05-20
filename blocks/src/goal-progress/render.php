@@ -23,28 +23,28 @@ $target_id   = isset( $attributes['targetId'] ) ? (int) $attributes['targetId'] 
 
 if ( 'auto' === $target_type ) {
 	$post = get_post();
-	if ( ! $post ) {
-		return;
-	}
-	switch ( $post->post_type ) {
-		case \Team51\GivingDay\PostTypes\Team::POST_TYPE:
-			$target_type = GoalProgress::TYPE_TEAM;
-			$target_id   = (int) $post->ID;
-			break;
-		case \Team51\GivingDay\PostTypes\Beneficiary::POST_TYPE:
-			$target_type = GoalProgress::TYPE_BENEFICIARY;
-			$target_id   = (int) $post->ID;
-			break;
-		case \Team51\GivingDay\PostTypes\Campaign::POST_TYPE:
-			$target_type = GoalProgress::TYPE_CAMPAIGN;
-			$target_id   = (int) $post->ID;
-			break;
-		default:
-			return;
+	if ( $post ) {
+		switch ( $post->post_type ) {
+			case \Team51\GivingDay\PostTypes\Team::POST_TYPE:
+				$target_type = GoalProgress::TYPE_TEAM;
+				$target_id   = (int) $post->ID;
+				break;
+			case \Team51\GivingDay\PostTypes\Beneficiary::POST_TYPE:
+				$target_type = GoalProgress::TYPE_BENEFICIARY;
+				$target_id   = (int) $post->ID;
+				break;
+			case \Team51\GivingDay\PostTypes\Campaign::POST_TYPE:
+				$target_type = GoalProgress::TYPE_CAMPAIGN;
+				$target_id   = (int) $post->ID;
+				break;
+		}
 	}
 }
 
-// Back-compat: legacy block instances stored campaignId only.
+// Fallback: when auto resolution didn't land on a specific target,
+// honor an explicit campaignId (legacy attribute, or one injected by
+// theme-level render_block_data filters that resolve the active
+// campaign for context-less pages like /donate).
 if ( $target_id <= 0 && ! empty( $attributes['campaignId'] ) ) {
 	$target_type = GoalProgress::TYPE_CAMPAIGN;
 	$target_id   = (int) $attributes['campaignId'];

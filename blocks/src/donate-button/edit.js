@@ -8,7 +8,9 @@ import {
 
 export default function Edit( { attributes, setAttributes } ) {
 	const { label, targetType, targetId } = attributes;
-	const blockProps = useBlockProps( { className: 'giving-day-donate-button' } );
+	const blockProps = useBlockProps( {
+		className: 'wp-block-button giving-day-donate-button',
+	} );
 
 	return (
 		<>
