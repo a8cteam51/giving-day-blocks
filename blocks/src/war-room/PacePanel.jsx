@@ -1,9 +1,11 @@
 import { __ } from '@wordpress/i18n';
+import { useId } from '@wordpress/element';
 
 import { formatCurrency, formatNumber } from '../_shared/utils/formatCurrency';
 import HourlyChart from './HourlyChart';
 
 export default function PacePanel( { data } ) {
+	const headingId = useId();
 	const pace = data?.pace || {};
 	const currency = data?.currency || 'USD';
 	const lastHour = pace.last_hour || { raised: 0, count: 0 };
@@ -11,12 +13,10 @@ export default function PacePanel( { data } ) {
 	return (
 		<section
 			className="giving-day-warroom__panel giving-day-warroom__panel--pace"
-			aria-labelledby="gd-warroom-pace-heading"
+			aria-labelledby={ headingId }
 		>
 			<header className="giving-day-warroom__panel-header">
-				<h2 id="gd-warroom-pace-heading">
-					{ __( 'Pace', 'giving-day-blocks' ) }
-				</h2>
+				<h2 id={ headingId }>{ __( 'Pace', 'giving-day-blocks' ) }</h2>
 			</header>
 			<div className="giving-day-warroom__stat-row">
 				<div className="giving-day-warroom__stat">

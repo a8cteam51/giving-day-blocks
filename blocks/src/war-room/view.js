@@ -26,9 +26,17 @@ function bootstrap( root ) {
 	if ( ! campaignId ) {
 		return;
 	}
-	const panels = parseJSON( root.dataset.panels, ALL_PANELS );
+	const parsedPanels = parseJSON( root.dataset.panels, ALL_PANELS );
+	const panels = Array.isArray( parsedPanels ) ? parsedPanels : ALL_PANELS;
 	const initialData = parseJSON( root.dataset.initial, null );
-	const intervalMs = parseInt( root.dataset.refreshMs || '10000', 10 );
+	const parsedInterval = Number.parseInt(
+		root.dataset.refreshMs || '10000',
+		10
+	);
+	const intervalMs =
+		Number.isFinite( parsedInterval ) && parsedInterval >= 1000
+			? parsedInterval
+			: 10000;
 
 	const reactRoot = createRoot( root );
 	reactRoot.render(

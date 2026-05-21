@@ -44,9 +44,9 @@ $extra = array(
 	'class'                   => 'giving-day-warroom',
 	'data-giving-day-warroom' => '1',
 	'data-campaign-id'        => (string) $campaign_id,
-	'data-panels'             => esc_attr( wp_json_encode( $panels ) ),
+	'data-panels'             => wp_json_encode( $panels ),
 	'data-refresh-ms'         => (string) $refresh_ms,
-	'data-initial'            => esc_attr( wp_json_encode( $initial ) ),
+	'data-initial'            => wp_json_encode( $initial ),
 );
 
 $wrapper_attrs = get_block_wrapper_attributes( $extra );

@@ -1,4 +1,5 @@
 import { __ } from '@wordpress/i18n';
+import { useId } from '@wordpress/element';
 
 import { formatCurrency, formatNumber } from '../_shared/utils/formatCurrency';
 
@@ -9,6 +10,7 @@ const STATUS_LABEL = {
 };
 
 export default function SummaryPanel( { data } ) {
+	const headingId = useId();
 	const summary = data?.summary || {};
 	const currency = data?.currency || 'USD';
 	const status = data?.status || 'scheduled';
@@ -17,10 +19,10 @@ export default function SummaryPanel( { data } ) {
 	return (
 		<section
 			className="giving-day-warroom__panel giving-day-warroom__panel--summary"
-			aria-labelledby="gd-warroom-summary-heading"
+			aria-labelledby={ headingId }
 		>
 			<header className="giving-day-warroom__panel-header">
-				<h2 id="gd-warroom-summary-heading">
+				<h2 id={ headingId }>
 					{ __( 'Campaign summary', 'giving-day-blocks' ) }
 				</h2>
 				<span

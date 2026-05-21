@@ -195,6 +195,7 @@
 	&__chart {
 		margin: 0;
 		width: 100%;
+
 		// Cap the chart so wide panels don't blow it up to full-width 720×180
 		// (~225px tall on a 900px container), which felt out of proportion
 		// next to the breakdown / top lists.
@@ -426,7 +427,7 @@
 
 .screen-reader-text {
 	position: absolute !important;
-	clip: rect(1px, 1px, 1px, 1px);
+	clip-path: inset(50%);
 	width: 1px;
 	height: 1px;
 	overflow: hidden;

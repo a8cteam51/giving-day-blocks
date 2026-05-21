@@ -14,16 +14,22 @@ import { withPreviewParam } from './usePreviewOverride';
  */
 export function useWarRoom( campaignId, options = {} ) {
 	const { intervalMs = 10000, initialData = null } = options;
+	const safeIntervalMs = Math.max( 1000, Number( intervalMs ) || 10000 );
 	const [ data, setData ] = useState( initialData );
 	const [ error, setError ] = useState( null );
 	const [ loading, setLoading ] = useState( ! initialData );
-	const backoffRef = useRef( intervalMs );
+	const backoffRef = useRef( safeIntervalMs );
 
 	useEffect( () => {
 		if ( ! campaignId ) {
 			setData( null );
+			setError( null );
+			setLoading( false );
 			return undefined;
 		}
+		setData( initialData ?? null );
+		setError( null );
+		setLoading( true );
 		let cancelled = false;
 		let timerId = null;
 
@@ -39,7 +45,7 @@ export function useWarRoom( campaignId, options = {} ) {
 				return;
 			}
 			if ( document.visibilityState === 'hidden' ) {
-				schedule( intervalMs );
+				schedule( safeIntervalMs );
 				return;
 			}
 			try {
@@ -54,8 +60,8 @@ export function useWarRoom( campaignId, options = {} ) {
 				setData( payload );
 				setError( null );
 				setLoading( false );
-				backoffRef.current = intervalMs;
-				schedule( intervalMs );
+				backoffRef.current = safeIntervalMs;
+				schedule( safeIntervalMs );
 			} catch ( err ) {
 				if ( cancelled ) {
 					return;
@@ -91,7 +97,7 @@ export function useWarRoom( campaignId, options = {} ) {
 			}
 			document.removeEventListener( 'visibilitychange', onVisibility );
 		};
-	}, [ campaignId, intervalMs ] );
+	}, [ campaignId, safeIntervalMs, initialData ] );
 
 	return { data, error, loading };
 }

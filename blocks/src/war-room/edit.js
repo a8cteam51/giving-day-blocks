@@ -16,6 +16,8 @@ import './editor.scss';
 
 export default function Edit( { attributes, setAttributes } ) {
 	const { campaignId, panels, refreshInterval } = attributes;
+	const selectedPanels =
+		Array.isArray( panels ) && panels.length ? panels : ALL_PANELS;
 
 	const { campaigns, campaign } = useSelect(
 		( select ) => {
@@ -44,7 +46,7 @@ export default function Edit( { attributes, setAttributes } ) {
 	} );
 
 	const togglePanel = ( id ) => ( checked ) => {
-		const next = new Set( panels || [] );
+		const next = new Set( selectedPanels );
 		if ( checked ) {
 			next.add( id );
 		} else {
@@ -91,7 +93,7 @@ export default function Edit( { attributes, setAttributes } ) {
 						<CheckboxControl
 							key={ panel }
 							label={ PANEL_LABELS[ panel ] }
-							checked={ ( panels || [] ).includes( panel ) }
+							checked={ selectedPanels.includes( panel ) }
 							onChange={ togglePanel( panel ) }
 						/>
 					) ) }
@@ -139,7 +141,7 @@ export default function Edit( { attributes, setAttributes } ) {
 			) : (
 				<WarRoom
 					campaignId={ campaignId }
-					panels={ panels || ALL_PANELS }
+					panels={ selectedPanels }
 					intervalMs={ refreshInterval || 10000 }
 				/>
 			) }

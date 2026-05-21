@@ -1,8 +1,10 @@
 import { __, sprintf } from '@wordpress/i18n';
+import { useId } from '@wordpress/element';
 
 import { formatCurrency, formatNumber } from '../_shared/utils/formatCurrency';
 
 export default function ActiveMatchesPanel( { data } ) {
+	const headingId = useId();
 	const matches = Array.isArray( data?.active_matches )
 		? data.active_matches
 		: [];
@@ -11,10 +13,10 @@ export default function ActiveMatchesPanel( { data } ) {
 	return (
 		<section
 			className="giving-day-warroom__panel giving-day-warroom__panel--matches"
-			aria-labelledby="gd-warroom-matches-heading"
+			aria-labelledby={ headingId }
 		>
 			<header className="giving-day-warroom__panel-header">
-				<h2 id="gd-warroom-matches-heading">
+				<h2 id={ headingId }>
 					{ __( 'Active matches', 'giving-day-blocks' ) }
 				</h2>
 				<span className="giving-day-warroom__panel-meta">

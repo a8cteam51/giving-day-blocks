@@ -635,9 +635,12 @@ final class REST {
 	 */
 	public function get_warroom( WP_REST_Request $request ) {
 		$campaign_id = (int) $request['id'];
-		$campaign    = $this->locate_readable_campaign( $campaign_id );
-		if ( is_wp_error( $campaign ) ) {
-			return $campaign;
+		if ( Campaign::POST_TYPE !== get_post_type( $campaign_id ) ) {
+			return new WP_Error(
+				'giving_day_blocks_campaign_not_found',
+				__( 'Campaign not found.', 'giving-day-blocks' ),
+				array( 'status' => 404 )
+			);
 		}
 
 		$override = $this->preview_override_from_request( $request );

@@ -173,12 +173,20 @@ final class CampaignListColumns {
 		if ( '' === $raw ) {
 			return '—';
 		}
-		$ts = strtotime( $raw );
-		if ( false === $ts ) {
+		// The stored value is naive wall-clock text in the site's intended
+		// timezone (no offset suffix). Parse it explicitly against
+		// wp_timezone() so strtotime's server-default-TZ interpretation
+		// doesn't shift the display when the two differ.
+		$tz = wp_timezone();
+		$dt = \DateTimeImmutable::createFromFormat( 'Y-m-d\TH:i:s', $raw, $tz );
+		if ( false === $dt ) {
+			$dt = \DateTimeImmutable::createFromFormat( 'Y-m-d\TH:i', $raw, $tz );
+		}
+		if ( false === $dt ) {
 			return $raw;
 		}
 		$format = trim( get_option( 'date_format' ) . ' ' . get_option( 'time_format' ) );
-		return wp_date( $format, $ts );
+		return wp_date( $format, $dt->getTimestamp() );
 	}
 
 	/**
@@ -369,7 +377,7 @@ final class CampaignListColumns {
 		}
 		if ( array_key_exists( 'gd_goal', $_POST ) ) {
 			$raw  = sanitize_text_field( wp_unslash( $_POST['gd_goal'] ) );
-			$goal = '' === $raw ? '' : (float) $raw;
+			$goal = '' === $raw ? '' : max( 0.0, (float) $raw );
 			update_post_meta( $post_id, Campaign::META_GOAL_AMOUNT, $goal );
 		}
 		// phpcs:enable WordPress.Security.NonceVerification.Missing
@@ -385,11 +393,16 @@ final class CampaignListColumns {
 			delete_post_meta( $post_id, $meta_key );
 			return;
 		}
-		$ts = strtotime( $raw );
-		if ( false === $ts ) {
+		// `<input type="datetime-local">` emits naive wall-clock text; going
+		// through strtotime → gmdate would convert local→UTC and shift the
+		// stored value on every save. Keep the value opaque, just normalize
+		// to seconds precision so it matches the format the rest of the
+		// plugin writes.
+		if ( ! preg_match( '/^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2})(:\d{2})?$/', $raw, $m ) ) {
 			return;
 		}
-		update_post_meta( $post_id, $meta_key, gmdate( 'Y-m-d\TH:i:s', $ts ) );
+		$normalized = $m[1] . ( isset( $m[2] ) && '' !== $m[2] ? $m[2] : ':00' );
+		update_post_meta( $post_id, $meta_key, $normalized );
 	}
 
 	/**

@@ -312,8 +312,9 @@ final class Aggregator {
 	 * @return array<string,mixed>
 	 */
 	public static function warroom_payload( int $campaign_id, ?string $preview_override = null ): array {
-		$ver = self::cache_version( $campaign_id );
-		$key = sprintf( '%s%d_%d', self::WARROOM_TRANSIENT_PREFIX, $ver, $campaign_id );
+		$ver         = self::cache_version( $campaign_id );
+		$preview_key = null !== $preview_override ? sanitize_key( $preview_override ) : 'auto';
+		$key         = sprintf( '%s%d_%d_%s', self::WARROOM_TRANSIENT_PREFIX, $ver, $campaign_id, $preview_key );
 
 		$cached = get_transient( $key );
 		if ( false !== $cached && is_array( $cached ) ) {
@@ -1375,7 +1376,7 @@ final class Aggregator {
 			// Offline-flagged orders bypass the window: admins explicitly
 			// attribute them, so a Saturday gala donation entered on Monday
 			// (or any backdated entry) still counts.
-			if ( '1' === (string) $order->get_meta( OfflineDonations::META_OFFLINE_FLAG ) ) {
+			if ( self::order_is_offline( $order ) ) {
 				yield $order;
 			}
 		}
