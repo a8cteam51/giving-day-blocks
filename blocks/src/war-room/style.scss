@@ -1,0 +1,434 @@
+@import "../_shared/tokens";
+
+.giving-day-warroom {
+	color: var(--giving-day-secondary);
+	font-variant-numeric: tabular-nums;
+
+	&__loading,
+	&__empty,
+	&__error {
+		margin: 0;
+		padding: 1rem;
+		color: var(--giving-day-muted);
+		text-align: center;
+	}
+
+	&__error {
+		color: #b00020;
+	}
+
+	&__grid {
+		display: grid;
+		gap: 1rem;
+		grid-template-columns: 1fr;
+
+		@include media(md) {
+			grid-template-columns: 1fr 1fr;
+		}
+	}
+
+	&__cell {
+		min-width: 0;
+
+		&--full {
+			@include media(md) {
+				grid-column: 1 / -1;
+			}
+		}
+	}
+
+	&__panel {
+		background: var(--giving-day-surface);
+		border: 1px solid color-mix(in srgb, var(--giving-day-muted) 25%, transparent);
+		border-radius: var(--giving-day-radius);
+		padding: 1rem 1.25rem;
+		display: flex;
+		flex-direction: column;
+		gap: 0.75rem;
+		height: 100%;
+	}
+
+	&__panel-header {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 0.5rem;
+
+		h2,
+		h3 {
+			margin: 0;
+			font-size: 0.95rem;
+			font-weight: 700;
+			letter-spacing: 0.04em;
+			text-transform: uppercase;
+			color: var(--giving-day-muted);
+		}
+	}
+
+	&__panel-meta {
+		font-size: 0.85rem;
+		color: var(--giving-day-muted);
+	}
+
+	&__status {
+		font-size: 0.75rem;
+		font-weight: 700;
+		letter-spacing: 0.08em;
+		text-transform: uppercase;
+		padding: 0.15rem 0.55rem;
+		border-radius: 999px;
+		background: color-mix(in srgb, var(--giving-day-muted) 15%, transparent);
+		color: var(--giving-day-muted);
+
+		&--live {
+			background: color-mix(in srgb, #16a34a 20%, transparent);
+			color: #16a34a;
+		}
+		&--ended {
+			background: color-mix(in srgb, var(--giving-day-secondary) 12%, transparent);
+			color: var(--giving-day-secondary);
+		}
+	}
+
+	&__summary-grid {
+		display: flex;
+		flex-direction: column;
+		gap: 0.75rem;
+	}
+
+	&__summary-headline {
+		display: flex;
+		align-items: baseline;
+		gap: 0.5rem;
+		flex-wrap: wrap;
+	}
+
+	&__summary-amount {
+		font-size: clamp(2.25rem, 6vw, 3.5rem);
+		font-weight: 800;
+		line-height: 1;
+		color: var(--giving-day-primary);
+	}
+
+	&__summary-goal {
+		color: var(--giving-day-muted);
+	}
+
+	&__summary-bar {
+		position: relative;
+		height: 8px;
+		background: color-mix(in srgb, var(--giving-day-muted) 18%, transparent);
+		border-radius: 999px;
+		overflow: hidden;
+	}
+
+	&__summary-bar-fill {
+		position: absolute;
+		inset: 0 auto 0 0;
+		background: var(--giving-day-primary);
+		transition: width 400ms ease;
+
+		@include reduced-motion {
+			transition: none;
+		}
+	}
+
+	&__summary-stats {
+		display: grid;
+		grid-template-columns: repeat(3, 1fr);
+		gap: 0.5rem;
+		margin: 0;
+
+		div {
+			display: flex;
+			flex-direction: column;
+			gap: 0.15rem;
+		}
+
+		dt {
+			margin: 0;
+			font-size: 0.75rem;
+			letter-spacing: 0.06em;
+			text-transform: uppercase;
+			color: var(--giving-day-muted);
+		}
+
+		dd {
+			margin: 0;
+			font-size: 1.1rem;
+			font-weight: 700;
+		}
+	}
+
+	&__stat-row {
+		display: flex;
+		gap: 1rem;
+		flex-wrap: wrap;
+	}
+
+	&__stat {
+		flex: 1;
+		min-width: 0;
+		display: flex;
+		flex-direction: column;
+		gap: 0.15rem;
+	}
+
+	&__stat-label {
+		font-size: 0.75rem;
+		letter-spacing: 0.06em;
+		text-transform: uppercase;
+		color: var(--giving-day-muted);
+	}
+
+	&__stat-value {
+		font-size: 1.5rem;
+		font-weight: 800;
+		color: var(--giving-day-primary);
+	}
+
+	&__stat-meta {
+		font-size: 0.85rem;
+		color: var(--giving-day-muted);
+	}
+
+	&__chart {
+		margin: 0;
+		width: 100%;
+
+		// Cap the chart so wide panels don't blow it up to full-width 720×180
+		// (~225px tall on a 900px container), which felt out of proportion
+		// next to the breakdown / top lists.
+		max-width: 1200px;
+		margin-inline: auto;
+	}
+
+	&__chart-svg {
+		display: block;
+		width: 100%;
+		height: auto;
+		overflow: visible;
+	}
+
+	&__chart-grid {
+		stroke: color-mix(in srgb, var(--giving-day-muted) 20%, transparent);
+		stroke-width: 1;
+		stroke-dasharray: 2 4;
+	}
+
+	&__chart-axis {
+		fill: var(--giving-day-muted);
+		font-size: 10px;
+	}
+
+	&__chart-area {
+		fill: color-mix(in srgb, var(--giving-day-primary) 12%, transparent);
+		stroke: none;
+	}
+
+	&__chart-line {
+		fill: none;
+		stroke: var(--giving-day-primary);
+		stroke-width: 2;
+		stroke-linejoin: round;
+		stroke-linecap: round;
+	}
+
+	&__chart-point {
+		fill: var(--giving-day-primary);
+	}
+
+	&__match-list,
+	&__top-list,
+	&__recent {
+		list-style: none;
+		margin: 0;
+		padding: 0;
+		display: flex;
+		flex-direction: column;
+		gap: 0.5rem;
+	}
+
+	&__match {
+		display: flex;
+		flex-direction: column;
+		gap: 0.35rem;
+	}
+
+	&__match-head {
+		display: flex;
+		justify-content: space-between;
+		align-items: baseline;
+		gap: 0.5rem;
+	}
+
+	&__match-secondary {
+		font-size: 0.8rem;
+		color: var(--giving-day-muted);
+	}
+
+	&__match-foot {
+		font-size: 0.85rem;
+		color: var(--giving-day-muted);
+	}
+
+	&__breakdown {
+		display: flex;
+		flex-direction: column;
+		gap: 1rem;
+	}
+
+	&__breakdown-group {
+		h3 {
+			margin: 0 0 0.5rem;
+			font-size: 0.85rem;
+			text-transform: uppercase;
+			letter-spacing: 0.06em;
+			color: var(--giving-day-muted);
+		}
+
+		ul {
+			list-style: none;
+			padding: 0;
+			margin: 0;
+			display: flex;
+			flex-direction: column;
+			gap: 0.5rem;
+		}
+	}
+
+	&__breakdown-row {
+		display: flex;
+		flex-direction: column;
+		gap: 0.25rem;
+	}
+
+	&__breakdown-head {
+		display: flex;
+		justify-content: space-between;
+		font-size: 0.9rem;
+	}
+
+	&__breakdown-bar {
+		height: 6px;
+		background: color-mix(in srgb, var(--giving-day-muted) 18%, transparent);
+		border-radius: 999px;
+		overflow: hidden;
+		position: relative;
+	}
+
+	&__breakdown-bar-fill {
+		position: absolute;
+		inset: 0 auto 0 0;
+		background: var(--giving-day-accent);
+		transition: width 400ms ease;
+
+		@include reduced-motion {
+			transition: none;
+		}
+	}
+
+	&__top-row {
+		display: grid;
+		grid-template-columns: auto 1fr auto;
+		gap: 0.5rem;
+		align-items: baseline;
+		padding: 0.35rem 0;
+		border-bottom: 1px dashed color-mix(in srgb, var(--giving-day-muted) 25%, transparent);
+
+		&:last-child {
+			border-bottom: 0;
+		}
+	}
+
+	&__top-rank {
+		font-weight: 700;
+		color: var(--giving-day-muted);
+		min-width: 1.5rem;
+	}
+
+	&__top-title {
+		min-width: 0;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+
+	&__top-amount {
+		font-weight: 700;
+		color: var(--giving-day-primary);
+	}
+
+	&__recent-row {
+		display: grid;
+		grid-template-columns: 1fr auto;
+		grid-template-areas:
+			"donor amount"
+			"meta meta";
+		gap: 0.25rem 0.5rem;
+		padding: 0.5rem 0;
+		border-bottom: 1px dashed color-mix(in srgb, var(--giving-day-muted) 25%, transparent);
+
+		&:last-child {
+			border-bottom: 0;
+		}
+	}
+
+	&__recent-donor {
+		grid-area: donor;
+		display: inline-flex;
+		gap: 0.4rem;
+		align-items: center;
+		font-weight: 600;
+	}
+
+	&__recent-amount {
+		grid-area: amount;
+		font-weight: 700;
+		color: var(--giving-day-primary);
+	}
+
+	&__recent-meta {
+		grid-area: meta;
+		display: flex;
+		justify-content: space-between;
+		font-size: 0.8rem;
+		color: var(--giving-day-muted);
+		gap: 0.5rem;
+	}
+
+	&__recent-designation {
+		min-width: 0;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+
+	&__badge {
+		font-size: 0.65rem;
+		font-weight: 700;
+		letter-spacing: 0.05em;
+		text-transform: uppercase;
+		padding: 0.05rem 0.4rem;
+		border-radius: 999px;
+		background: color-mix(in srgb, var(--giving-day-muted) 18%, transparent);
+		color: var(--giving-day-muted);
+
+		&--offline {
+			background: color-mix(in srgb, #d97706 18%, transparent);
+			color: #d97706;
+		}
+		&--recurring {
+			background: color-mix(in srgb, #6366f1 18%, transparent);
+			color: #6366f1;
+		}
+	}
+}
+
+.screen-reader-text {
+	position: absolute !important;
+	clip-path: inset(50%);
+	width: 1px;
+	height: 1px;
+	overflow: hidden;
+}

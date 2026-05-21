@@ -1,0 +1,51 @@
+{
+	"$schema": "https://schemas.wp.org/trunk/block.json",
+	"apiVersion": 3,
+	"name": "giving-day/war-room",
+	"version": "0.1.0",
+	"title": "Giving Day: War Room",
+	"category": "widgets",
+	"icon": "dashboard",
+	"description": "Back-office live dashboard for organizers. Renders only for users with manage_woocommerce.",
+	"keywords": [ "giving day", "war room", "dashboard", "organizer" ],
+	"textdomain": "giving-day-blocks",
+	"supports": {
+		"html": false,
+		"color": {
+			"background": true,
+			"text": true
+		},
+		"spacing": {
+			"margin": true,
+			"padding": true
+		},
+		"align": [ "wide", "full" ]
+	},
+	"attributes": {
+		"campaignId": {
+			"type": "number"
+		},
+		"panels": {
+			"type": "array",
+			"default": [
+				"summary",
+				"pace",
+				"matches",
+				"breakdown",
+				"top_teams",
+				"top_beneficiaries",
+				"recent"
+			],
+			"items": { "type": "string" }
+		},
+		"refreshInterval": {
+			"type": "number",
+			"default": 10000
+		}
+	},
+	"editorScript": "file:./index.js",
+	"viewScript": "file:./view.js",
+	"style": "file:./style-index.css",
+	"editorStyle": "file:./index.css",
+	"render": "file:./render.php"
+}

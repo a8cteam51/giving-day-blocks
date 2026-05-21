@@ -29,6 +29,7 @@
 
 namespace Team51\GivingDay\Data;
 
+use Team51\GivingDay\Integrations\OfflineGateway;
 use Team51\GivingDay\Integrations\OrderAttribution;
 use Team51\GivingDay\PostTypes\Campaign;
 use Team51\GivingDay\Services\OfflineDonations;
@@ -58,6 +59,11 @@ final class Aggregator {
 	 * Transient prefix for entity (team/beneficiary) totals payloads.
 	 */
 	private const ENTITY_TOTALS_TRANSIENT_PREFIX = 'gd_entity_totals_';
+
+	/**
+	 * Transient prefix for the War Room composed payload.
+	 */
+	private const WARROOM_TRANSIENT_PREFIX = 'gd_warroom_';
 
 	/**
 	 * Short TTL for entity totals — long enough to absorb polling bursts,
@@ -119,6 +125,31 @@ final class Aggregator {
 	 */
 	public static function register_hooks(): void {
 		add_action( 'woocommerce_order_status_changed', array( self::class, 'on_order_status_changed' ), 20, 3 );
+		add_action( 'save_post_' . Campaign::POST_TYPE, array( self::class, 'on_campaign_saved' ), 20, 2 );
+	}
+
+	/**
+	 * Bumps the cache version when a Campaign post is saved (dates moved,
+	 * goal changed, status override flipped, etc.). Without this hook the
+	 * War Room and Goal Progress blocks render the previous payload for up
+	 * to {@see self::cache_ttl_seconds()} after the admin updates the
+	 * campaign — confusing when an organizer just extended the event by a
+	 * day and the dashboard still shows "ended".
+	 *
+	 * @param int      $post_id Campaign post ID.
+	 * @param \WP_Post $post    Post object.
+	 */
+	public static function on_campaign_saved( int $post_id, $post ): void {
+		if ( ! $post instanceof \WP_Post || Campaign::POST_TYPE !== $post->post_type ) {
+			return;
+		}
+		if ( defined( 'DOING_AUTOSAVE' ) && DOING_AUTOSAVE ) {
+			return;
+		}
+		if ( 'auto-draft' === $post->post_status ) {
+			return;
+		}
+		self::invalidate( $post_id );
 	}
 
 	/**
@@ -269,6 +300,360 @@ final class Aggregator {
 	}
 
 	/**
+	 * Fat read powering the War Room block + admin page (PLAN.md § 5.8).
+	 *
+	 * One transient holds the composed payload so polling clients don't
+	 * recompute the order scan + multiple leaderboard slices on every 10s
+	 * tick. The same cache-version bump that invalidates totals invalidates
+	 * this too, so a refunded order shows up on the next read.
+	 *
+	 * @param int         $campaign_id      Campaign post ID.
+	 * @param string|null $preview_override Optional `?givingday=` mapping for logged-in REST callers.
+	 * @return array<string,mixed>
+	 */
+	public static function warroom_payload( int $campaign_id, ?string $preview_override = null ): array {
+		$ver         = self::cache_version( $campaign_id );
+		$preview_key = null !== $preview_override ? sanitize_key( $preview_override ) : 'auto';
+		$key         = sprintf( '%s%d_%d_%s', self::WARROOM_TRANSIENT_PREFIX, $ver, $campaign_id, $preview_key );
+
+		$cached = get_transient( $key );
+		if ( false !== $cached && is_array( $cached ) ) {
+			return $cached;
+		}
+
+		$payload = self::compute_warroom_live( $campaign_id, $preview_override );
+
+		set_transient( $key, $payload, self::cache_ttl_seconds( $campaign_id, $preview_override ) );
+
+		return $payload;
+	}
+
+	/**
+	 * Single-pass computation of the War Room payload. One iteration over
+	 * attributed orders feeds the summary, pace, breakdown, recent-donations
+	 * and hourly chart — each leaderboard slice still goes through its own
+	 * cached Leaderboard::fetch so it can be reused independently.
+	 *
+	 * @param int         $campaign_id      Campaign post ID.
+	 * @param string|null $preview_override Optional status override.
+	 * @return array<string,mixed>
+	 */
+	private static function compute_warroom_live( int $campaign_id, ?string $preview_override = null ): array {
+		$status = Status::resolve( $campaign_id, $preview_override );
+		$now    = time();
+
+		$window_start_ts = self::campaign_unix( $campaign_id, Campaign::META_START_DATETIME );
+		$window_end_ts   = self::campaign_unix( $campaign_id, Campaign::META_END_DATETIME );
+
+		$last_hour_threshold = $now - HOUR_IN_SECONDS;
+
+		$raised     = 0.0;
+		$count      = 0;
+		$donor_keys = array();
+
+		$last_hour_raised = 0.0;
+		$last_hour_count  = 0;
+
+		$by_source = array(
+			'online'  => array( 'raised' => 0.0, 'count' => 0 ),
+			'offline' => array( 'raised' => 0.0, 'count' => 0 ),
+		);
+		$by_type = array(
+			'onetime'   => array( 'raised' => 0.0, 'count' => 0 ),
+			'recurring' => array( 'raised' => 0.0, 'count' => 0 ),
+		);
+
+		// Pick the bucket size up front so the inline accumulator below
+		// produces the right grain. Hourly for sub-week events (typical
+		// 24h Giving Day), daily for longer multi-week campaigns where
+		// hourly resolution would produce hundreds of unreadable points.
+		$bucket_seconds = self::pace_bucket_seconds( $window_start_ts, $window_end_ts );
+		$pace_buckets   = array(); // keyed by bucket-start unix ts
+		$recent         = array();
+
+		foreach ( self::each_attributed_order( $campaign_id ) as $order ) {
+			$donation_total = self::donation_total_for_order( $order );
+			if ( $donation_total <= 0 ) {
+				continue;
+			}
+
+			$raised += $donation_total;
+			++$count;
+
+			$donor_key = self::donor_key_for_order( $order );
+			if ( null !== $donor_key ) {
+				$donor_keys[ $donor_key ] = true;
+			}
+
+			$created    = $order->get_date_created();
+			$created_ts = $created instanceof \WC_DateTime ? (int) $created->getTimestamp() : 0;
+
+			if ( $created_ts > 0 && $created_ts >= $last_hour_threshold ) {
+				$last_hour_raised += $donation_total;
+				++$last_hour_count;
+			}
+
+			$is_offline = self::order_is_offline( $order );
+			$src_key    = $is_offline ? 'offline' : 'online';
+			$by_source[ $src_key ]['raised'] += $donation_total;
+			++$by_source[ $src_key ]['count'];
+
+			$is_recurring = self::order_is_recurring( $order );
+			$type_key     = $is_recurring ? 'recurring' : 'onetime';
+			$by_type[ $type_key ]['raised'] += $donation_total;
+			++$by_type[ $type_key ]['count'];
+
+			if (
+				$created_ts > 0
+				&& null !== $window_start_ts
+				&& null !== $window_end_ts
+				&& $created_ts >= $window_start_ts
+				&& $created_ts < ( $window_end_ts + $bucket_seconds )
+			) {
+				$bucket_start = $created_ts - ( ( $created_ts - $window_start_ts ) % $bucket_seconds );
+				if ( ! isset( $pace_buckets[ $bucket_start ] ) ) {
+					$pace_buckets[ $bucket_start ] = array(
+						'raised' => 0.0,
+						'count'  => 0,
+					);
+				}
+				$pace_buckets[ $bucket_start ]['raised'] += $donation_total;
+				++$pace_buckets[ $bucket_start ]['count'];
+			}
+
+			if ( count( $recent ) < 20 ) {
+				$recent[] = self::build_recent_donation_entry( $order, $donation_total, $is_offline );
+			}
+		}
+
+		$currency_meta = (string) get_post_meta( $campaign_id, Campaign::META_CURRENCY, true );
+		$currency      = '' !== $currency_meta ? $currency_meta : (string) get_option( 'woocommerce_currency', 'USD' );
+		$goal          = (float) get_post_meta( $campaign_id, Campaign::META_GOAL_AMOUNT, true );
+		$pct           = $goal > 0 ? min( 100.0, round( ( $raised / $goal ) * 100, 1 ) ) : 0.0;
+
+		$top_teams = Leaderboard::fetch(
+			$campaign_id,
+			Leaderboard::DIMENSION_TEAMS,
+			10,
+			array(),
+			$preview_override
+		);
+		$top_beneficiaries = Leaderboard::fetch(
+			$campaign_id,
+			Leaderboard::DIMENSION_BENEFICIARIES,
+			10,
+			array(),
+			$preview_override
+		);
+
+		return array(
+			'campaign_id'       => $campaign_id,
+			'currency'          => $currency,
+			'server_time'       => gmdate( 'c' ),
+			'status'            => $status,
+			'window_start'      => null !== $window_start_ts ? gmdate( 'c', $window_start_ts ) : null,
+			'window_end'        => null !== $window_end_ts ? gmdate( 'c', $window_end_ts ) : null,
+			'summary'           => array(
+				'raised'        => round( $raised, 2 ),
+				'goal'          => round( $goal, 2 ),
+				'percent'       => $pct,
+				'count'         => $count,
+				'avg'           => $count > 0 ? round( $raised / $count, 2 ) : 0.0,
+				'unique_donors' => count( $donor_keys ),
+			),
+			'pace'              => array(
+				'last_hour'   => array(
+					'raised' => round( $last_hour_raised, 2 ),
+					'count'  => $last_hour_count,
+				),
+				'bucket_size' => self::pace_bucket_label( $bucket_seconds ),
+				'hourly'      => self::finalize_pace_buckets( $pace_buckets, $window_start_ts, $window_end_ts, $now, $status, $bucket_seconds ),
+			),
+			'breakdown'         => array(
+				'by_source' => self::finalize_breakdown_rows(
+					$by_source,
+					array(
+						'online'  => __( 'Online', 'giving-day-blocks' ),
+						'offline' => __( 'Offline (cash / check / event)', 'giving-day-blocks' ),
+					),
+					$raised
+				),
+				'by_type'   => self::finalize_breakdown_rows(
+					$by_type,
+					array(
+						'onetime'   => __( 'One-time', 'giving-day-blocks' ),
+						'recurring' => __( 'Recurring', 'giving-day-blocks' ),
+					),
+					$raised
+				),
+			),
+			'active_matches'    => MatchProgress::active_for_campaign( $campaign_id, $now ),
+			'top_teams'         => $top_teams,
+			'top_beneficiaries' => $top_beneficiaries,
+			'recent_donations'  => $recent,
+		);
+	}
+
+	/**
+	 * True when an order was recorded via the OfflineGateway (admin-entered
+	 * cash/check/event-night donation). Used by the War Room breakdown panel.
+	 */
+	private static function order_is_offline( WC_Order $order ): bool {
+		if ( OfflineGateway::ID === (string) $order->get_payment_method() ) {
+			return true;
+		}
+		return '1' === (string) $order->get_meta( OfflineDonations::META_OFFLINE_FLAG );
+	}
+
+	/**
+	 * True when the order is part of a WooCommerce Subscription — either the
+	 * initial signup order, a renewal, a resubscribe, or a switch. Falls back
+	 * to checking `_subscription_renewal` directly when WCS helpers are absent
+	 * so the breakdown degrades gracefully if the plugin is deactivated.
+	 */
+	private static function order_is_recurring( WC_Order $order ): bool {
+		if ( function_exists( 'wcs_order_contains_subscription' ) ) {
+			return (bool) wcs_order_contains_subscription( $order, 'any' );
+		}
+		$renewal = (string) $order->get_meta( '_subscription_renewal' );
+		return '' !== $renewal;
+	}
+
+	/**
+	 * Recent-donations row for the War Room. Honors the same anonymous flag
+	 * as the snapshot donor list and never includes email addresses.
+	 *
+	 * @param WC_Order $order
+	 * @param float    $amount     Donation portion of the order total.
+	 * @param bool     $is_offline Pre-computed offline flag (avoids re-reading meta).
+	 * @return array<string,mixed>
+	 */
+	private static function build_recent_donation_entry( WC_Order $order, float $amount, bool $is_offline ): array {
+		$entry = self::build_donor_list_entry( $order, $amount );
+
+		$beneficiary_id = (int) $order->get_meta( OrderAttribution::META_BENEFICIARY_ID );
+		$team_id        = (int) $order->get_meta( OrderAttribution::META_TEAM_ID );
+
+		$entry['beneficiary'] = $beneficiary_id > 0
+			? array( 'id' => $beneficiary_id, 'title' => (string) get_the_title( $beneficiary_id ) )
+			: null;
+		$entry['team'] = $team_id > 0
+			? array( 'id' => $team_id, 'title' => (string) get_the_title( $team_id ) )
+			: null;
+		$entry['offline']   = $is_offline;
+		$entry['recurring'] = self::order_is_recurring( $order );
+
+		return $entry;
+	}
+
+	/**
+	 * Chooses the chart bucket size for a campaign window. Hourly until the
+	 * window exceeds a week — beyond that, hourly buckets pile up faster than
+	 * an organizer can read them, so we drop to daily.
+	 */
+	private static function pace_bucket_seconds( ?int $window_start_ts, ?int $window_end_ts ): int {
+		if ( null === $window_start_ts || null === $window_end_ts || $window_end_ts <= $window_start_ts ) {
+			return HOUR_IN_SECONDS;
+		}
+		return ( $window_end_ts - $window_start_ts ) > ( 7 * DAY_IN_SECONDS )
+			? DAY_IN_SECONDS
+			: HOUR_IN_SECONDS;
+	}
+
+	/**
+	 * Human label for the resolved bucket size, surfaced in the payload so
+	 * the chart axis can render "per hour" vs "per day" copy.
+	 */
+	private static function pace_bucket_label( int $bucket_seconds ): string {
+		return DAY_IN_SECONDS === $bucket_seconds ? 'day' : 'hour';
+	}
+
+	/**
+	 * Generates a contiguous series across the campaign window at the
+	 * resolved bucket size, filling empty buckets with zeros so the chart
+	 * renders a continuous line.
+	 *
+	 * @param array<int, array{raised:float,count:int}> $buckets         Keyed by bucket-start unix ts.
+	 * @param int|null                                  $window_start_ts Campaign start unix ts.
+	 * @param int|null                                  $window_end_ts   Campaign end unix ts.
+	 * @param int                                       $now             Server "now" unix ts.
+	 * @param string                                    $status          Resolved campaign status.
+	 * @param int                                       $bucket_seconds  Bucket size in seconds.
+	 * @return list<array<string,mixed>>
+	 */
+	private static function finalize_pace_buckets( array $buckets, ?int $window_start_ts, ?int $window_end_ts, int $now, string $status, int $bucket_seconds ): array {
+		if ( null === $window_start_ts || null === $window_end_ts || $window_end_ts <= $window_start_ts ) {
+			return array();
+		}
+
+		// Pre-event: nothing yet to chart.
+		if ( Status::SCHEDULED === $status && $now < $window_start_ts ) {
+			return array();
+		}
+
+		// Live: clamp the right edge to the current bucket so we don't draw
+		// a flat-zero tail running out to the campaign end.
+		$right_edge = ( Status::LIVE === $status ) ? min( $now, $window_end_ts ) : $window_end_ts;
+		if ( $right_edge < $window_start_ts ) {
+			return array();
+		}
+
+		$out = array();
+		for ( $h = $window_start_ts; $h <= $right_edge; $h += $bucket_seconds ) {
+			$bucket = $buckets[ $h ] ?? array(
+				'raised' => 0.0,
+				'count'  => 0,
+			);
+			$out[]  = array(
+				'hour_start' => gmdate( 'c', $h ),
+				'raised'     => round( (float) $bucket['raised'], 2 ),
+				'count'      => (int) $bucket['count'],
+			);
+		}
+		return $out;
+	}
+
+	/**
+	 * Converts a {key => {raised,count}} working map into a stable
+	 * list-of-rows with labels + percentage of campaign-wide raised.
+	 *
+	 * @param array<string, array{raised:float,count:int}> $rows
+	 * @param array<string, string>                        $labels
+	 * @param float                                        $total_raised
+	 * @return list<array<string,mixed>>
+	 */
+	private static function finalize_breakdown_rows( array $rows, array $labels, float $total_raised ): array {
+		$out = array();
+		foreach ( $rows as $k => $row ) {
+			$amount = round( (float) $row['raised'], 2 );
+			$out[]  = array(
+				'key'     => (string) $k,
+				'label'   => $labels[ $k ] ?? (string) $k,
+				'raised'  => $amount,
+				'count'   => (int) $row['count'],
+				'percent' => $total_raised > 0 ? round( ( $amount / $total_raised ) * 100, 1 ) : 0.0,
+			);
+		}
+		return $out;
+	}
+
+	/**
+	 * Resolves a Campaign datetime meta to a unix timestamp, or null when
+	 * the meta is unset / unparseable.
+	 *
+	 * @param int    $campaign_id Campaign post ID.
+	 * @param string $meta_key    META_START_DATETIME or META_END_DATETIME.
+	 */
+	private static function campaign_unix( int $campaign_id, string $meta_key ): ?int {
+		$raw = (string) get_post_meta( $campaign_id, $meta_key, true );
+		if ( '' === $raw ) {
+			return null;
+		}
+		$ts = strtotime( $raw );
+		return false === $ts ? null : (int) $ts;
+	}
+
+	/**
 	 * Drops the cached totals for one Team or Beneficiary.
 	 *
 	 * @param string $meta_key  OrderAttribution::META_TEAM_ID or META_BENEFICIARY_ID.
@@ -325,12 +710,8 @@ final class Aggregator {
 				'limit'      => -1,
 				'return'     => 'ids',
 				'status'     => self::COUNTING_STATUSES,
-				'meta_query' => array( // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_query
-					array(
-						'key'   => $meta_key,
-						'value' => (string) $entity_id,
-					),
-				),
+				'meta_key'   => $meta_key,
+				'meta_value' => (string) $entity_id,
 			)
 		);
 		$order_ids = is_array( $order_ids ) ? $order_ids : array();
@@ -956,56 +1337,46 @@ final class Aggregator {
 			return;
 		}
 
-		$base_args = array(
-			'limit'      => -1,
-			'return'     => 'ids',
-			'status'     => self::COUNTING_STATUSES,
-			'meta_key'   => OrderAttribution::META_CAMPAIGN_ID,
-			'meta_value' => (string) $campaign_id,
-			'orderby'    => 'date',
-			'order'      => 'DESC',
-		);
-
-		// In-window orders: date_created scoped to the campaign event window.
-		$args  = $base_args;
-		$start = self::campaign_order_date_boundary( $campaign_id, Campaign::META_START_DATETIME );
-		$end   = self::campaign_order_date_boundary( $campaign_id, Campaign::META_END_DATETIME );
-		if ( null !== $start && null !== $end ) {
-			$args['date_created'] = $start . '...' . $end;
-		}
-		$in_window_ids = wc_get_orders( $args );
-		$in_window_ids = is_array( $in_window_ids ) ? $in_window_ids : array();
-
-		// Offline-flagged orders bypass the window: admins explicitly attribute
-		// them to the campaign, so a Saturday gala donation entered on Monday
-		// (or any backdated/late entry) still counts.
-		$offline_ids = wc_get_orders(
+		$ids = wc_get_orders(
 			array(
 				'limit'      => -1,
 				'return'     => 'ids',
 				'status'     => self::COUNTING_STATUSES,
+				'meta_key'   => OrderAttribution::META_CAMPAIGN_ID,
+				'meta_value' => (string) $campaign_id,
 				'orderby'    => 'date',
 				'order'      => 'DESC',
-				'meta_query' => array( // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_query
-					'relation' => 'AND',
-					array(
-						'key'   => OrderAttribution::META_CAMPAIGN_ID,
-						'value' => (string) $campaign_id,
-					),
-					array(
-						'key'   => OfflineDonations::META_OFFLINE_FLAG,
-						'value' => '1',
-					),
-				),
 			)
 		);
-		$offline_ids = is_array( $offline_ids ) ? $offline_ids : array();
+		if ( ! is_array( $ids ) || empty( $ids ) ) {
+			return;
+		}
 
-		$ids = array_values( array_unique( array_map( 'intval', array_merge( $in_window_ids, $offline_ids ) ) ) );
+		$start_raw  = self::campaign_order_date_boundary( $campaign_id, Campaign::META_START_DATETIME );
+		$end_raw    = self::campaign_order_date_boundary( $campaign_id, Campaign::META_END_DATETIME );
+		$start_ts   = null !== $start_raw ? (int) $start_raw : null;
+		$end_ts     = null !== $end_raw ? (int) $end_raw : null;
+		$has_window = null !== $start_ts && null !== $end_ts;
 
 		foreach ( $ids as $order_id ) {
-			$order = wc_get_order( $order_id );
-			if ( $order instanceof WC_Order ) {
+			$order = wc_get_order( (int) $order_id );
+			if ( ! $order instanceof WC_Order ) {
+				continue;
+			}
+			if ( ! $has_window ) {
+				yield $order;
+				continue;
+			}
+			$created = $order->get_date_created();
+			$ts      = $created instanceof \WC_DateTime ? (int) $created->getTimestamp() : 0;
+			if ( $ts >= $start_ts && $ts <= $end_ts ) {
+				yield $order;
+				continue;
+			}
+			// Offline-flagged orders bypass the window: admins explicitly
+			// attribute them, so a Saturday gala donation entered on Monday
+			// (or any backdated entry) still counts.
+			if ( self::order_is_offline( $order ) ) {
 				yield $order;
 			}
 		}
