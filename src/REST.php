@@ -145,6 +145,17 @@ final class REST {
 			)
 		);
 
+		register_rest_route(
+			self::NAMESPACE,
+			'/campaign/(?P<id>\d+)/warroom',
+			array(
+				'methods'             => WP_REST_Server::READABLE,
+				'permission_callback' => array( $this, 'check_view_warroom' ),
+				'args'                => array( 'id' => $args['id'] ),
+				'callback'            => array( $this, 'get_warroom' ),
+			)
+		);
+
 		$leaderboard_args = array_merge(
 			$args,
 			array(
@@ -596,6 +607,41 @@ final class REST {
 				array( 'status' => 404 )
 			);
 		}
+
+		return $this->respond( $payload );
+	}
+
+	/**
+	 * Permission callback: requires `manage_woocommerce`. The War Room
+	 * payload surfaces donor display names + recent order list, same data
+	 * surface the post-event results endpoint guards.
+	 *
+	 * @param WP_REST_Request $request
+	 * @return bool|WP_Error
+	 */
+	public function check_view_warroom( WP_REST_Request $request ) {
+		unset( $request );
+		if ( ! current_user_can( 'manage_woocommerce' ) ) {
+			return new WP_Error( 'giving_day_forbidden_warroom', __( 'You cannot view the war room.', 'giving-day-blocks' ), array( 'status' => 403 ) );
+		}
+		return true;
+	}
+
+	/**
+	 * GET /campaign/{id}/warroom
+	 *
+	 * @param WP_REST_Request $request
+	 * @return WP_REST_Response|WP_Error
+	 */
+	public function get_warroom( WP_REST_Request $request ) {
+		$campaign_id = (int) $request['id'];
+		$campaign    = $this->locate_readable_campaign( $campaign_id );
+		if ( is_wp_error( $campaign ) ) {
+			return $campaign;
+		}
+
+		$override = $this->preview_override_from_request( $request );
+		$payload  = Aggregator::warroom_payload( $campaign_id, $override );
 
 		return $this->respond( $payload );
 	}

@@ -9,6 +9,7 @@
 namespace Team51\GivingDay;
 
 use Team51\GivingDay\Admin\CampaignEditor;
+use Team51\GivingDay\Admin\CampaignListColumns;
 use Team51\GivingDay\Admin\DonationPageSetting;
 use Team51\GivingDay\Admin\CauseTermMeta;
 use Team51\GivingDay\Admin\Menu as AdminMenu;
@@ -20,6 +21,7 @@ use Team51\GivingDay\Admin\OfflineDonations as OfflineDonationsAdmin;
 use Team51\GivingDay\Admin\OrderAttributionBox;
 use Team51\GivingDay\Admin\ResultsExport;
 use Team51\GivingDay\Admin\ResultsPage;
+use Team51\GivingDay\Admin\WarRoomPage;
 use Team51\GivingDay\Admin\ScreenIntro;
 use Team51\GivingDay\Admin\SettingsPage;
 use Team51\GivingDay\Admin\TeamEditor;
@@ -240,6 +242,8 @@ final class Plugin {
 		$this->campaign_editor = new CampaignEditor();
 		$this->campaign_editor->register();
 
+		( new CampaignListColumns() )->register();
+
 		( new SettingsPage() )->register();
 
 		( new OrderAttributionBox() )->register();
@@ -268,6 +272,7 @@ final class Plugin {
 
 		( new ResultsPage() )->register();
 		( new ResultsExport() )->register();
+		( new WarRoomPage() )->register();
 
 		( new ImportPage() )->register();
 		( new ImportShortcuts() )->register();
